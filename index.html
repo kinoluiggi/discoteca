@@ -387,7 +387,7 @@ const CONFIG = {
   LASTFM_KEY: '6b8d7a206bd7449cedb73dc6182d028e'
 };
 
-let INDICE = [], MODO_REMOTO = false, BASE = '';
+let INDICE = [], MODO_REMOTO = false, BASE = '', PAISES_ARTISTA = null;
 const $ = id => document.getElementById(id);
 
 async function cargarIndice(){
@@ -411,8 +411,21 @@ async function cargarIndice(){
       n:a.tracks.length, v:a.tracks.filter(t=>t.videoId).length,
       generos:a.generos||[], pais:a.pais||null}));
   }
+  // mapa opcional de país REAL del artista (MusicBrainz)
+  try{
+    const r = await fetch(BASE + 'paises_artistas.json');
+    if(r.ok) PAISES_ARTISTA = await r.json();
+  }catch(_){ /* sin mapa: se usa país de edición */ }
   $('sub-header').textContent =
     `${INDICE.length} ÁLBUMES` + (MODO_REMOTO ? '' : ' · DEMO');
+}
+
+// país efectivo de una entrada: del artista si hay mapa, si no de la edición
+function paisDe(e){
+  if(PAISES_ARTISTA){
+    return PAISES_ARTISTA[normalizar(e.artista||'')] || null;
+  }
+  return e.pais;
 }
 async function cargarAlbum(entrada){
   if(MODO_REMOTO){
@@ -455,9 +468,12 @@ function pintarSelectores(){
   const cuentaG = {}, cuentaP = {};
   INDICE.forEach(e=>{
     (e.generos||[]).forEach(g=> cuentaG[g]=(cuentaG[g]||0)+1);
-    if(e.pais) cuentaP[e.pais]=(cuentaP[e.pais]||0)+1;
+    const p = paisDe(e);
+    if(p) cuentaP[p]=(cuentaP[p]||0)+1;
   });
   const selG = $('sel-genero'), selP = $('sel-pais');
+  selP.options[0].textContent = PAISES_ARTISTA
+    ? 'PAÍS ARTISTA: TODOS' : 'PAÍS (EDICIÓN): TODOS';
   const gs = Object.keys(cuentaG).sort((a,b)=>cuentaG[b]-cuentaG[a]);
   const ps = Object.keys(cuentaP).sort((a,b)=>cuentaP[b]-cuentaP[a]);
   if(gs.length){
@@ -484,7 +500,7 @@ function visiblesAhora(){
   return INDICE.filter(e=>{
     if(filtroDecada && decadaDe(e.año)!==filtroDecada) return false;
     if(filtroGenero && !(e.generos||[]).includes(filtroGenero)) return false;
-    if(filtroPais && e.pais !== filtroPais) return false;
+    if(filtroPais && paisDe(e) !== filtroPais) return false;
     if(q && !normalizar(e.artista+' '+e.album).includes(q)) return false;
     return true;
   });
