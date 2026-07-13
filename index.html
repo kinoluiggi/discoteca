@@ -435,7 +435,10 @@ function paisDe(e){
 }
 async function cargarAlbum(entrada){
   if(MODO_REMOTO){
-    const r = await fetch(BASE + entrada.ruta);
+    // en modo curador, saltarse el caché para ver la versión recién guardada
+    const extra = (typeof MODO_EDITAR !== 'undefined' && MODO_EDITAR)
+      ? '?t=' + Date.now() : '';
+    const r = await fetch(BASE + entrada.ruta + extra);
     return await r.json();
   }
   return DATOS_EMBEBIDOS.find(a => a.id === entrada.id);
@@ -970,7 +973,8 @@ function editarPortada(){
     `Pega la URL de la imagen (vacío = quitar portada):`,
     ALBUM.portada || '');
   if(resp === null) return;
-  ALBUM.portada = resp.trim() || null;
+  // limpiar espacios y saltos de línea que se cuelan al copiar URLs largas
+  ALBUM.portada = resp.replace(/\s+/g, '') || null;
   hayCambios = true;
   pintarAlbumUI();
   const btn = $('btn-guardar');
