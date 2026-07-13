@@ -615,6 +615,21 @@ function pintarAlbumUI(){
     $('pt-titulo').textContent = ALBUM.album||'—';
     $('pt-artista').textContent = ALBUM.artista||'';
   }
+  // botón de cambio de portada (modo curador)
+  const zonaP = document.querySelector('.portada-zona');
+  const viejo = $('btn-portada');
+  if(viejo) viejo.remove();
+  if(MODO_EDITAR && ALBUM._ruta){
+    const b = document.createElement('button');
+    b.id = 'btn-portada';
+    b.textContent = '✎ PORTADA';
+    b.style.cssText = 'position:absolute;top:10px;right:10px;z-index:5;' +
+      'background:rgba(13,15,18,.85);border:1px solid var(--ambar);' +
+      'color:var(--ambar);border-radius:6px;padding:6px 10px;' +
+      'font-size:10px;letter-spacing:.1em;cursor:pointer;font-family:inherit';
+    b.onclick = ()=> editarPortada();
+    zonaP.appendChild(b);
+  }
   $('info-album').textContent = ALBUM.album||'—';
   $('info-artista').textContent = ALBUM.artista||'';
   const durTotal = ALBUM.tracks.reduce((s,t)=>s+(t.duracion||0),0);
@@ -948,6 +963,19 @@ function animarAnalizador(on){
 /* ====================== MODO CURADOR (?editar) ====================== */
 const MODO_EDITAR = new URLSearchParams(location.search).has('editar');
 let hayCambios = false;
+
+function editarPortada(){
+  const resp = prompt(
+    `Portada para:\n${ALBUM.artista} — ${ALBUM.album}\n\n` +
+    `Pega la URL de la imagen (vacío = quitar portada):`,
+    ALBUM.portada || '');
+  if(resp === null) return;
+  ALBUM.portada = resp.trim() || null;
+  hayCambios = true;
+  pintarAlbumUI();
+  const btn = $('btn-guardar');
+  if(btn) btn.style.display = '';
+}
 
 function editarPista(i){
   const t = ALBUM.tracks[i];
