@@ -315,6 +315,8 @@ input[type=range]::-moz-range-thumb{
   <div class="barra-superior">
     <button class="volver" id="btn-volver">← LA DISCOTECA</button>
     <div class="titulo-album" id="titulo-album"></div>
+    <button class="volver" id="btn-guardar" style="display:none;color:var(--ambar);border-color:var(--ambar)"
+            onclick="guardarEnGitHub()">💾 GUARDAR EN GITHUB</button>
   </div>
 
   <div class="player">
@@ -384,7 +386,11 @@ const CONFIG = {
   DISCOGS_USER: 'kinoluiggi',   // usuario de Discogs (dueño de la colección)
   DISCOGS_TOKEN: 'mpkVHVRdThOWTdPRKuBCCqlFQQTBofjPolbwTljO',
   LASTFM_USER: 'kinoluiggi',
-  LASTFM_KEY: '6b8d7a206bd7449cedb73dc6182d028e'
+  LASTFM_KEY: '6b8d7a206bd7449cedb73dc6182d028e',
+  // URL de tu Cloudflare Worker de scrobbling (vacío = scrobbling apagado)
+  SCROBBLE_WORKER: '',
+  // repo de GitHub para el modo curador (?editar en la URL)
+  GITHUB_REPO: 'kinoluiggi/discoteca'
 };
 
 let INDICE = [], MODO_REMOTO = false, BASE = '', PAISES_ARTISTA = null;
@@ -562,6 +568,37 @@ let ALBUM=null, pista=0, sonando=false, reloj=null;
 let shuffle=false, repetir=false, orden=[], posOrden=0;
 let RADIO=false, radioCandidatos=[];
 
+/* ---------- scrobbling vía Worker (regla oficial: 50% o 4 min) ---------- */
+let scrob = {nowplaying:false, enviado:false, inicio:0};
+
+function scrobblear(payload){
+  if(!CONFIG.SCROBBLE_WORKER) return;
+  fetch(CONFIG.SCROBBLE_WORKER, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  }).catch(()=>{});
+}
+function scrobNowPlaying(){
+  if(scrob.nowplaying || !ALBUM) return;
+  const t = ALBUM.tracks[pista];
+  if(!t || !t.videoId) return;
+  scrob.nowplaying = true;
+  scrobblear({type:'nowplaying', artist:ALBUM.artista,
+              track:t.titulo, album:ALBUM.album});
+}
+function scrobRevisar(s, d){
+  if(scrob.enviado || !ALBUM || !CONFIG.SCROBBLE_WORKER) return;
+  if(d < 30) return;                    // Last.fm ignora pistas <30s
+  if(s >= Math.min(d/2, 240)){          // 50% de la pista o 4 minutos
+    scrob.enviado = true;
+    const t = ALBUM.tracks[pista];
+    scrobblear({type:'scrobble', artist:ALBUM.artista,
+                track:t.titulo, album:ALBUM.album,
+                timestamp: scrob.inicio});
+  }
+}
+
 function pintarAlbumUI(){
   $('titulo-album').innerHTML =
     (RADIO ? '<span style="color:var(--ambar)">📻 RADIO</span> · ' : '') +
@@ -601,6 +638,19 @@ function pintarAlbumUI(){
     div.innerHTML=`<span class="num">${String(t.num||i+1).padStart(2,'0')}</span>
       <span class="titulo">${t.titulo||'—'}${t.videoId?'':' · (sin video)'}</span>
       <span class="dur">${fmt(t.duracion)}</span>`;
+    if(MODO_EDITAR && ALBUM._ruta){
+      const busca=document.createElement('a');
+      busca.textContent='🔎'; busca.title='Buscar en YouTube';
+      busca.href='https://www.youtube.com/results?search_query='+
+        encodeURIComponent((ALBUM.artista||'')+' '+(t.titulo||''));
+      busca.target='_blank'; busca.style.cssText='text-decoration:none;font-size:12px';
+      busca.onclick=ev=>ev.stopPropagation();
+      const lapiz=document.createElement('button');
+      lapiz.textContent='✎'; lapiz.title='Pegar URL o ID de YouTube';
+      lapiz.style.cssText='background:none;border:none;color:var(--ambar);cursor:pointer;font-size:13px';
+      lapiz.onclick=ev=>{ ev.stopPropagation(); editarPista(i); };
+      div.appendChild(busca); div.appendChild(lapiz);
+    }
     if(t.videoId) div.onclick=()=>{ irA(i); };
     lista.appendChild(div);
   });
@@ -630,6 +680,7 @@ function mostrarPlayer(){
 
 async function abrirAlbum(entrada, autoplay=false){
   const alb = await cargarAlbum(entrada);
+  if(MODO_REMOTO) alb._ruta = BASE + entrada.ruta;  // ruta en el repo
   abrirAlbumObjeto(alb, autoplay);
 }
 
@@ -734,6 +785,8 @@ function regenerarOrden(){
 
 function cargar(i, reproducir=false){
   pista=i;
+  scrob = {nowplaying:false, enviado:false,
+           inicio: Math.floor(Date.now()/1000)};
   const t=ALBUM.tracks[i];
   if(!RADIO){
     document.querySelectorAll('.pista').forEach((el,j)=>
@@ -774,6 +827,7 @@ function stopTodo(){
 }
 function sincronizar(playing){
   sonando=playing;
+  if(playing) scrobNowPlaying();
   $('mini-cd').classList.toggle('girando', playing);
   $('btn-play').textContent = playing ? '⏸' : '▶';
   clearInterval(reloj);
@@ -797,6 +851,7 @@ function tic(){
   $('t-actual').textContent = fmt(s);
   $('t-total').textContent = fmt(d);
   ponerSeek(s,d);
+  scrobRevisar(s, d);
 }
 function ponerSeek(s,d){
   const v = Math.round(1000*s/Math.max(d,1));
@@ -888,6 +943,69 @@ function animarAnalizador(on){
       b.style.height = (3+Math.random()*22)+'px';
     });
   }, 130);
+}
+
+/* ====================== MODO CURADOR (?editar) ====================== */
+const MODO_EDITAR = new URLSearchParams(location.search).has('editar');
+let hayCambios = false;
+
+function editarPista(i){
+  const t = ALBUM.tracks[i];
+  const actual = t.videoId || '';
+  const resp = prompt(
+    `Video para:\n${ALBUM.artista} — ${t.titulo}\n\n` +
+    `Pega la URL o el ID de YouTube (vacío = quitar video):`, actual);
+  if(resp === null) return;
+  const m = resp.match(/(?:v=|youtu\.be\/|shorts\/)?([\w-]{11})(?:\W|$)/);
+  t.videoId = m ? m[1] : null;
+  t.fuente = t.videoId ? 'curador' : undefined;
+  hayCambios = true;
+  pintarAlbumUI();
+  const btn = $('btn-guardar');
+  if(btn) btn.style.display = '';
+}
+
+function utoa(str){  // base64 con soporte unicode
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+async function guardarEnGitHub(){
+  if(!ALBUM._ruta){ alert('Este álbum no es editable (vinilo o demo).'); return; }
+  let token = localStorage.getItem('gh_token');
+  if(!token){
+    token = prompt('Pega tu token de GitHub (con permiso repo).\n' +
+                   'Se guarda solo en este navegador:');
+    if(!token) return;
+    localStorage.setItem('gh_token', token.trim());
+    token = token.trim();
+  }
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}` +
+              `/contents/${ALBUM._ruta}`;
+  const cab = {'Authorization': 'Bearer ' + token,
+               'Accept': 'application/vnd.github+json'};
+  try{
+    const r1 = await fetch(api + '?ref=main', {headers: cab});
+    if(!r1.ok) throw new Error('leyendo archivo: ' + r1.status);
+    const sha = (await r1.json()).sha;
+    const limpio = {...ALBUM};
+    delete limpio._ruta;
+    const r2 = await fetch(api, {
+      method: 'PUT', headers: cab,
+      body: JSON.stringify({
+        message: `curador: ${ALBUM.artista} — ${ALBUM.album}`,
+        content: utoa(JSON.stringify(limpio)),
+        sha, branch: 'main'
+      })
+    });
+    if(!r2.ok) throw new Error('guardando: ' + r2.status);
+    hayCambios = false;
+    $('btn-guardar').style.display = 'none';
+    alert('✓ Guardado en GitHub.\nEl sitio se actualiza en 1-2 minutos.');
+  }catch(e){
+    if(String(e).includes('401')) localStorage.removeItem('gh_token');
+    alert('Error: ' + e.message +
+          (String(e).includes('401') ? '\n(token inválido: se pedirá de nuevo)' : ''));
+  }
 }
 
 /* ====================== VINILOS (Discogs) ====================== */
