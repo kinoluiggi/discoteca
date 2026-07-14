@@ -1,0 +1,40 @@
+name: Regenerar índice
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'albums/**'
+      - 'eliminados.json'
+      - 'discoteca/albums/**'
+      - 'discoteca/eliminados.json'
+  workflow_dispatch:   # botón de ejecución manual, por si acaso
+
+permissions:
+  contents: write
+
+concurrency:
+  group: regenerar-indice
+  cancel-in-progress: true
+
+jobs:
+  regenerar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Regenerar indice.json
+        run: python3 herramientas/regenerar_indice.py .
+
+      - name: Publicar si cambió
+        run: |
+          git config user.name "curador-bot"
+          git config user.email "actions@github.com"
+          if git diff --quiet; then
+            echo "El índice no cambió, nada que publicar."
+          else
+            git add indice.json discoteca/indice.json 2>/dev/null || git add indice.json
+            git commit -m "índice regenerado automáticamente [skip ci]"
+            git push
+          fi
