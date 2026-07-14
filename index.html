@@ -344,6 +344,7 @@ input[type=range]::-moz-range-thumb{
           <span>VIDEO</span><span id="video-flecha">▾</span>
         </button>
         <div id="yt-wrap"><div id="yt-player"></div></div>
+        <audio id="motor-audio" preload="none" style="display:none"></audio>
       </div>
     </div>
 
@@ -575,6 +576,9 @@ let ALBUM=null, pista=0, sonando=false, reloj=null;
 let shuffle=false, repetir=false, orden=[], posOrden=0;
 let RADIO=false, radioCandidatos=[];
 
+/* pista reproducible: tiene video de YouTube O audio directo */
+const reproducible = t => !!(t && (t.videoId || t.audio));
+
 /* ---------- scrobbling vía Worker (regla oficial: 50% o 4 min) ---------- */
 let scrob = {nowplaying:false, enviado:false, inicio:0};
 
@@ -589,7 +593,7 @@ function scrobblear(payload){
 function scrobNowPlaying(){
   if(scrob.nowplaying || !ALBUM) return;
   const t = ALBUM.tracks[pista];
-  if(!t || !t.videoId) return;
+  if(!reproducible(t)) return;
   scrob.nowplaying = true;
   scrobblear({type:'nowplaying', artist:ALBUM.artista,
               track:t.titulo, album:ALBUM.album});
@@ -669,9 +673,9 @@ function pintarAlbumUI(){
   lista.innerHTML='';
   ALBUM.tracks.forEach((t,i)=>{
     const div=document.createElement('div');
-    div.className='pista'+(t.videoId?'':' muda');
+    div.className='pista'+(reproducible(t)?'':' muda');
     div.innerHTML=`<span class="num">${String(t.num||i+1).padStart(2,'0')}</span>
-      <span class="titulo">${t.titulo||'—'}${t.videoId?'':' · (sin video)'}</span>
+      <span class="titulo">${t.titulo||'—'}${reproducible(t)?'':' · (sin fuente)'}${t.audio?' · ♪':''}</span>
       <span class="dur">${fmt(t.duracion)}</span>`;
     if(MODO_EDITAR && ALBUM._ruta){
       const busca=document.createElement('a');
@@ -686,7 +690,7 @@ function pintarAlbumUI(){
       lapiz.onclick=ev=>{ ev.stopPropagation(); editarPista(i); };
       div.appendChild(busca); div.appendChild(lapiz);
     }
-    if(t.videoId) div.onclick=()=>{ irA(i); };
+    if(reproducible(t)) div.onclick=()=>{ irA(i); };
     lista.appendChild(div);
   });
 }
@@ -759,10 +763,10 @@ async function ampliarCola(n=15){
   const albums=await Promise.all(picks.map(p=>cargarAlbum(p).catch(()=>null)));
   albums.forEach(al=>{
     if(!al) return;
-    const conVideo=al.tracks.map((t,i)=>t.videoId?i:-1).filter(i=>i>=0);
-    if(!conVideo.length) return;
+    const conFuente=al.tracks.map((t,i)=>reproducible(t)?i:-1).filter(i=>i>=0);
+    if(!conFuente.length) return;
     cola.push({album:al,
-               trackIdx:conVideo[Math.floor(Math.random()*conVideo.length)]});
+               trackIdx:conFuente[Math.floor(Math.random()*conFuente.length)]});
   });
   ampliando=false;
   if(RADIO) pintarColaUI();
@@ -809,7 +813,7 @@ function fmt(s){
 }
 
 function regenerarOrden(){
-  orden = ALBUM.tracks.map((t,i)=>t.videoId?i:-1).filter(i=>i>=0);
+  orden = ALBUM.tracks.map((t,i)=>reproducible(t)?i:-1).filter(i=>i>=0);
   if(shuffle){
     for(let i=orden.length-1;i>0;i--){
       const j=Math.floor(Math.random()*(i+1));
@@ -830,10 +834,15 @@ function cargar(i, reproducir=false){
   $('t-actual').textContent='0:00';
   $('t-total').textContent=fmt(t.duracion);
   ponerSeek(0, t.duracion||1);
-  if(t.videoId && ytListo){
+  const au = $('motor-audio');
+  if(t.audio){
+    if(ytListo && yt.stopVideo) yt.stopVideo();
+    au.src = t.audio;
+    if(reproducir) au.play().catch(()=>{});
+  } else if(t.videoId && ytListo){
+    au.pause(); au.removeAttribute('src');
     // loadVideoById carga Y reproduce en un solo paso: conserva el
-    // permiso del clic del usuario (los navegadores bloquean el
-    // cue + play en dos tiempos por política de autoplay)
+    // permiso del clic del usuario
     if(reproducir) yt.loadVideoById(t.videoId);
     else yt.cueVideoById(t.videoId);
   }
@@ -845,18 +854,28 @@ function irA(i){
 }
 function play(){
   const t=ALBUM.tracks[pista];
-  if(!t.videoId){ siguiente(); return; }
+  if(!reproducible(t)){ siguiente(); return; }
+  if(t.audio){
+    $('motor-audio').play().catch(()=>{});
+    sincronizar(true);
+    return;
+  }
   if(ytListo){
     const st = yt.getPlayerState ? yt.getPlayerState() : -1;
-    // si el video solo está "preparado" (cued) o sin iniciar,
-    // relanzarlo con loadVideoById para heredar el gesto del clic
     if(st === 5 || st === -1) yt.loadVideoById(t.videoId);
     else yt.playVideo();
   }
   sincronizar(true);
 }
-function pausa(){ if(ytListo) yt.pauseVideo(); sincronizar(false); }
+function pausa(){
+  const t=ALBUM && ALBUM.tracks[pista];
+  if(t && t.audio) $('motor-audio').pause();
+  else if(ytListo) yt.pauseVideo();
+  sincronizar(false);
+}
 function stopTodo(){
+  const au=$('motor-audio');
+  au.pause(); au.removeAttribute('src');
   if(ytListo && yt.stopVideo) yt.stopVideo();
   detener();
 }
@@ -879,10 +898,18 @@ function detener(){
   animarAnalizador(false);
 }
 function tic(){
-  if(!ytListo || arrastrando) return;
-  const s = yt.getCurrentTime ? yt.getCurrentTime() : 0;
-  const d = (yt.getDuration && yt.getDuration()) ||
-            ALBUM.tracks[pista].duracion || 1;
+  if(arrastrando) return;
+  const t = ALBUM.tracks[pista];
+  let s, d;
+  if(t.audio){
+    const au = $('motor-audio');
+    s = au.currentTime || 0;
+    d = au.duration || t.duracion || 1;
+  } else {
+    if(!ytListo) return;
+    s = yt.getCurrentTime ? yt.getCurrentTime() : 0;
+    d = (yt.getDuration && yt.getDuration()) || t.duracion || 1;
+  }
   $('t-actual').textContent = fmt(s);
   $('t-total').textContent = fmt(d);
   ponerSeek(s,d);
@@ -922,14 +949,34 @@ $('seek').addEventListener('input', ()=>{ arrastrando=true;
   $('seek').style.setProperty('--prog', ($('seek').value/10)+'%'); });
 $('seek').addEventListener('change', ()=>{
   arrastrando=false;
+  const t = ALBUM && ALBUM.tracks[pista];
+  if(t && t.audio){
+    const au = $('motor-audio');
+    const d = au.duration || t.duracion || 0;
+    au.currentTime = d * $('seek').value/1000;
+    return;
+  }
   if(!ytListo) return;
   const d = (yt.getDuration && yt.getDuration()) ||
             ALBUM.tracks[pista].duracion || 0;
   yt.seekTo(d * $('seek').value/1000, true);
 });
 $('vol').addEventListener('input', ()=>{
-  if(ytListo) yt.setVolume(parseInt($('vol').value));
+  const v = parseInt($('vol').value);
+  if(ytListo) yt.setVolume(v);
+  $('motor-audio').volume = v/100;
 });
+
+/* eventos del motor de audio */
+(function(){
+  const au = $('motor-audio');
+  au.addEventListener('ended', ()=> RADIO ? radioSiguiente() : siguiente());
+  au.addEventListener('playing', ()=> sincronizar(true));
+  au.addEventListener('pause', ()=>{ if(!au.ended) sincronizar(false); });
+  au.addEventListener('error', ()=>{
+    if(au.getAttribute('src')){ marcarRota(); RADIO ? radioSiguiente() : siguiente(); }
+  });
+})();
 
 /* botones */
 $('btn-play').onclick = ()=> sonando ? pausa() : play();
@@ -1019,12 +1066,21 @@ function editarPista(i){
   const t = ALBUM.tracks[i];
   const actual = t.videoId || '';
   const resp = prompt(
-    `Video para:\n${ALBUM.artista} — ${t.titulo}\n\n` +
-    `Pega la URL o el ID de YouTube (vacío = quitar video):`, actual);
+    `Fuente para:\n${ALBUM.artista} — ${t.titulo}\n\n` +
+    `Pega URL/ID de YouTube, o URL de audio directo (.mp3/.m4a/.ogg)\n` +
+    `(vacío = quitar fuente):`, t.audio || actual);
   if(resp === null) return;
-  const m = resp.match(/(?:v=|youtu\.be\/|shorts\/)?([\w-]{11})(?:\W|$)/);
-  t.videoId = m ? m[1] : null;
-  t.fuente = t.videoId ? 'curador' : undefined;
+  const limpio2 = resp.replace(/\s+/g, '');
+  if(/^https?:\/\/.+\.(mp3|m4a|ogg|aac|wav|flac)(\?.*)?$/i.test(limpio2)){
+    t.audio = limpio2;
+    t.videoId = null;
+    t.fuente = 'curador-audio';
+  } else {
+    const m = limpio2.match(/(?:v=|youtu\.be\/|shorts\/)?([\w-]{11})(?:\W|$)/);
+    t.videoId = m ? m[1] : null;
+    delete t.audio;
+    t.fuente = t.videoId ? 'curador' : undefined;
+  }
   hayCambios = true;
   pintarAlbumUI();
   const btn = $('btn-guardar');
