@@ -1,1 +1,1648 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KinoRecord · La Discoteca</title>
+<link rel="icon" href="favicon.ico">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@300;400;500&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --fondo:#0d0f12;
+  --panel:#15181d;
+  --panel-luz:#1b1f26;
+  --linea:#272c34;
+  --texto:#c9cdd4;
+  --texto-tenue:#79808a;
+  --ambar:#e8a33d;
+  --verde:#57e6a4;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--fondo);font-family:'Archivo',sans-serif;color:var(--texto);min-height:100vh}
+button{font-family:inherit}
 
+/* ============ CABECERA ============ */
+header{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:20px 26px 14px;border-bottom:1px solid var(--linea);
+  flex-wrap:wrap;gap:10px;
+}
+header h1{font-size:14px;letter-spacing:.24em;font-weight:600}
+header h1 span{color:var(--ambar)}
+header .sub{font-size:11px;letter-spacing:.16em;color:var(--texto-tenue)}
+.tabs{display:flex;gap:4px;padding:0 26px;border-bottom:1px solid var(--linea)}
+.tab{
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--texto-tenue);padding:12px 16px;font-size:12px;
+  letter-spacing:.16em;cursor:pointer;font-family:inherit;
+}
+.tab:hover{color:var(--texto)}
+.tab.activo{color:var(--ambar);border-bottom-color:var(--ambar)}
+/* panel last.fm */
+.lf-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:26px;padding:22px 26px 50px}
+.lf-h{font-size:11px;letter-spacing:.2em;color:var(--texto-tenue);
+  font-weight:600;margin-bottom:12px}
+.lf-item{display:flex;align-items:center;gap:11px;padding:7px 0;
+  border-bottom:1px solid rgba(39,44,52,.5)}
+.lf-item img,.lf-ph{width:42px;height:42px;border-radius:3px;object-fit:cover;
+  background:#14171c;flex:none}
+.lf-item div{flex:1;min-width:0}
+.lf-item b{display:block;font-size:12px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-item span{font-size:11px;color:var(--texto-tenue)}
+.lf-item i{font-size:10px;color:var(--ambar);font-style:normal;letter-spacing:.06em}
+/* modal de edición de ficha (modo curador) */
+#modal-ficha,#modal-dialogo{position:fixed;inset:0;background:rgba(0,0,0,.7);
+  display:flex;align-items:center;justify-content:center;z-index:100}
+#modal-ficha[hidden],#modal-dialogo[hidden]{display:none}
+.ficha-caja{background:var(--panel);border:1px solid var(--ambar);
+  border-radius:10px;padding:22px;width:min(420px,90vw);
+  box-shadow:0 30px 60px rgba(0,0,0,.7)}
+.ficha-caja h4{font-size:11px;letter-spacing:.2em;color:var(--ambar);
+  margin-bottom:14px}
+.ficha-caja label{display:block;font-size:10px;letter-spacing:.14em;
+  color:var(--texto-tenue);margin:10px 0 4px}
+.ficha-caja input{width:100%;background:#101216;border:1px solid var(--linea);
+  border-radius:6px;color:var(--texto);padding:9px 12px;font-size:14px;
+  font-family:inherit}
+.ficha-caja input:focus{outline:1px solid var(--ambar)}
+.ficha-botones{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.ficha-botones button{border-radius:6px;padding:8px 16px;font-size:11px;
+  letter-spacing:.1em;cursor:pointer;font-family:inherit}
+.ficha-ok{background:var(--ambar);border:none;color:#16181c;font-weight:600}
+.ficha-no{background:none;border:1px solid var(--linea);color:var(--texto-tenue)}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--panel);border:1px solid var(--ambar);color:var(--texto);
+  padding:11px 20px;border-radius:8px;font-size:12px;z-index:300;
+  opacity:0;pointer-events:none;transition:opacity .25s;white-space:pre-line;
+  box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:80vw;text-align:center}
+#toast.ver{opacity:1}
+
+/* ============ CONTROLES DEL GRID ============ */
+.controles{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 26px}
+.buscador{
+  flex:1;min-width:180px;max-width:360px;
+  background:#101216;border:1px solid var(--linea);border-radius:6px;
+  color:var(--texto);padding:9px 14px;font-size:13px;
+}
+.buscador:focus{outline:1px solid var(--ambar)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{
+  background:transparent;border:1px solid var(--linea);border-radius:20px;
+  color:var(--texto-tenue);padding:5px 12px;font-size:11px;
+  letter-spacing:.08em;cursor:pointer;transition:all .15s;
+}
+.chip:hover{border-color:var(--texto-tenue);color:var(--texto)}
+.chip.activo{border-color:var(--ambar);color:var(--ambar)}
+.btn-azar{
+  background:transparent;border:1px solid var(--linea);border-radius:6px;
+  color:var(--texto-tenue);padding:8px 14px;font-size:11px;
+  letter-spacing:.1em;cursor:pointer;
+}
+.btn-azar:hover{border-color:var(--ambar);color:var(--ambar)}
+.selector{
+  background:#101216;border:1px solid var(--linea);border-radius:6px;
+  color:var(--texto-tenue);padding:8px 10px;font-size:11px;
+  letter-spacing:.08em;cursor:pointer;font-family:inherit;
+}
+.selector:focus{outline:1px solid var(--ambar)}
+.contador{font-size:11px;color:var(--texto-tenue);letter-spacing:.1em;margin-left:auto}
+
+/* ============ GRID ============ */
+.grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:18px;padding:8px 26px 46px;
+}
+.tarjeta{cursor:pointer;transition:transform .15s}
+.tarjeta:hover{transform:translateY(-4px)}
+.tarjeta .cara{
+  aspect-ratio:1;border-radius:3px;overflow:hidden;position:relative;background:#14171c;
+  box-shadow:0 8px 20px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.06);
+}
+.tarjeta img{width:100%;height:100%;object-fit:cover;display:block}
+.cara-tipo{
+  position:absolute;inset:0;padding:12px;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  background:linear-gradient(160deg,#1d2b3a 0%,#0e1620 60%,#191307 100%);
+}
+.cara-tipo b{font-size:12px;line-height:1.2;color:#e8e4da;text-transform:uppercase}
+.cara-tipo i{font-size:9px;letter-spacing:.14em;color:var(--ambar);font-style:normal;margin-top:4px;text-transform:uppercase}
+.tarjeta .datos{margin-top:7px}
+.tarjeta .datos b{display:block;font-size:12px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tarjeta .datos span{font-size:11px;color:var(--texto-tenue)}
+.sin-video{opacity:.45}
+
+/* ============ VISTA PLAYER (estilo Amarok) ============ */
+#vista-player{display:none;padding:20px 26px 50px;max-width:1060px;margin:0 auto}
+.barra-superior{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.volver{
+  background:none;border:1px solid var(--linea);border-radius:6px;
+  color:var(--texto-tenue);padding:7px 14px;font-size:12px;
+  letter-spacing:.1em;cursor:pointer;
+}
+.volver:hover{color:var(--ambar);border-color:var(--ambar)}
+.titulo-album{font-size:13px;letter-spacing:.06em;color:var(--texto-tenue);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.titulo-album b{color:var(--texto)}
+
+.player{
+  background:var(--panel);
+  border:1px solid var(--linea);border-radius:10px;overflow:hidden;
+  box-shadow:0 30px 60px rgba(0,0,0,.55);
+  display:grid;
+  grid-template-columns:320px 1fr;
+  grid-template-rows:1fr auto;
+  min-height:480px;
+}
+@media(max-width:760px){.player{grid-template-columns:1fr;min-height:0}}
+
+/* --- panel de contexto (izquierda): portada integrada --- */
+.contexto{
+  border-right:1px solid var(--linea);
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg,var(--panel-luz),var(--panel) 40%);
+}
+@media(max-width:760px){.contexto{border-right:none;border-bottom:1px solid var(--linea)}}
+.portada-zona{position:relative;aspect-ratio:1;background:#0c0e11;overflow:hidden}
+.portada-zona img{width:100%;height:100%;object-fit:cover;display:block}
+.portada-tipo{
+  position:absolute;inset:0;padding:22px;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  background:linear-gradient(160deg,#1d2b3a 0%,#0e1620 55%,#1a1206 100%);
+}
+.portada-tipo b{font-size:22px;line-height:1.05;color:#f0e9dc;text-transform:uppercase}
+.portada-tipo i{font-size:11px;letter-spacing:.22em;color:var(--ambar);font-style:normal;margin-top:6px;text-transform:uppercase}
+/* mini-disco girando en la esquina de la portada, guiño al formato */
+.mini-cd{
+  position:absolute;right:12px;bottom:12px;width:46px;height:46px;border-radius:50%;
+  background:
+    conic-gradient(from 0deg,rgba(255,80,120,.35),rgba(255,190,60,.35),
+    rgba(120,255,140,.35),rgba(60,200,255,.4),rgba(150,90,255,.4),rgba(255,80,120,.35)),
+    radial-gradient(circle,#e8e9ec 0 18%,#c5c8ce 18% 100%);
+  box-shadow:0 3px 10px rgba(0,0,0,.6);
+  animation:girar 1.8s linear infinite;animation-play-state:paused;
+}
+.mini-cd.girando{animation-play-state:running}
+.mini-cd::after{content:'';position:absolute;inset:36%;border-radius:50%;
+  background:#0c0e11;box-shadow:0 0 0 3px #d5d7dc}
+@keyframes girar{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.mini-cd{animation:none}}
+
+.info-album{padding:16px 18px 12px}
+.info-album h2{font-size:17px;font-weight:700;line-height:1.2}
+.info-album h3{font-size:13px;font-weight:500;color:var(--ambar);margin-top:3px}
+.info-album .meta{font-size:11px;color:var(--texto-tenue);margin-top:6px;letter-spacing:.04em}
+.etiquetas{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.etiqueta-mini{
+  font-size:10px;letter-spacing:.06em;color:var(--texto-tenue);
+  border:1px solid var(--linea);border-radius:12px;padding:3px 9px;
+}
+
+/* --- video plegable dentro del contexto --- */
+.video-zona{margin-top:auto;border-top:1px solid var(--linea)}
+.video-toggle{
+  width:100%;background:none;border:none;color:var(--texto-tenue);
+  font-size:10px;letter-spacing:.2em;padding:8px;cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 16px;
+}
+.video-toggle:hover{color:var(--ambar)}
+#yt-wrap{height:180px;background:#000;transition:height .25s ease;overflow:hidden}
+#yt-wrap.plegado{height:42px}
+#yt-wrap iframe{width:100%;height:180px}
+
+/* --- playlist (derecha) --- */
+.playlist{display:flex;flex-direction:column;overflow:hidden}
+.playlist-cab{
+  display:flex;gap:13px;padding:10px 18px;font-size:10px;
+  letter-spacing:.16em;color:var(--texto-tenue);
+  border-bottom:1px solid var(--linea);background:var(--panel-luz);
+}
+.playlist-cab .c-num{width:24px}
+.playlist-cab .c-tit{flex:1}
+.pistas{flex:1;overflow-y:auto;min-height:200px;max-height:420px}
+.pista{
+  display:flex;align-items:baseline;gap:13px;padding:9px 18px;
+  font-size:13px;cursor:pointer;border-bottom:1px solid rgba(39,44,52,.5);
+  transition:background .12s;
+}
+.pista:hover{background:rgba(255,255,255,.03)}
+.pista.activa{background:rgba(232,163,61,.08)}
+.pista.activa .num,.pista.activa .titulo{color:var(--ambar)}
+.pista.muda{opacity:.4;cursor:default}
+.pista .num{font-family:'Chivo Mono',monospace;font-size:11px;color:var(--texto-tenue);width:24px}
+.pista .titulo{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pista .dur{font-family:'Chivo Mono',monospace;font-size:11px;color:var(--texto-tenue)}
+
+/* --- barra de transporte (abajo, ancho completo) --- */
+.transporte{
+  grid-column:1 / -1;
+  border-top:1px solid var(--linea);
+  background:linear-gradient(180deg,var(--panel-luz),var(--panel));
+  padding:12px 18px 14px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.linea-seek{display:flex;align-items:center;gap:12px}
+.tiempo{font-family:'Chivo Mono',monospace;font-size:11px;color:var(--texto-tenue);min-width:38px}
+.tiempo.actual{color:var(--verde);text-align:right}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;flex:1;height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--ambar) var(--prog,0%),#2a2f37 var(--prog,0%));
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+  background:var(--ambar);box-shadow:0 0 6px rgba(232,163,61,.5);
+}
+input[type=range]::-moz-range-thumb{
+  width:13px;height:13px;border-radius:50%;border:none;
+  background:var(--ambar);box-shadow:0 0 6px rgba(232,163,61,.5);
+}
+.linea-botones{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.boton{
+  background:linear-gradient(180deg,#262b33,#1b1f25);
+  border:1px solid var(--linea);border-radius:6px;color:var(--texto);
+  width:44px;height:36px;font-size:13px;cursor:pointer;
+  transition:transform .08s,background .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.boton:hover{background:linear-gradient(180deg,#2e343d,#20242b)}
+.boton:active{transform:translateY(1px)}
+.boton:focus-visible{outline:2px solid var(--ambar);outline-offset:2px}
+.boton.principal{width:58px;height:42px;color:var(--ambar);font-size:16px}
+.boton.modo{width:auto;padding:0 13px;font-size:11px;letter-spacing:.1em;color:var(--texto-tenue)}
+.boton.modo.activo{color:var(--ambar);border-color:var(--ambar)}
+.vol-zona{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:130px}
+.vol-zona span{font-size:11px;color:var(--texto-tenue)}
+#vol{max-width:90px}
+
+/* analizador de espectro, el guiño Amarok */
+.analizador{display:flex;align-items:flex-end;gap:2px;height:26px;margin-left:14px}
+.analizador i{width:4px;background:var(--verde);opacity:.85;border-radius:1px;
+  height:3px;transition:height .12s ease}
+@media(max-width:600px){.analizador{display:none}.vol-zona{display:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>KINO<span>RECORD</span> · LA DISCOTECA</h1>
+  <div class="sub" id="sub-header"></div>
+</header>
+
+<nav class="tabs">
+  <button class="tab activo" data-tab="discoteca">DISCOTECA</button>
+  <button class="tab" data-tab="vinilos">VINILOS</button>
+  <button class="tab" data-tab="lastfm">LAST.FM</button>
+</nav>
+
+<!-- ================= VISTA GRID ================= -->
+<div id="vista-grid">
+  <div class="controles">
+    <input class="buscador" id="buscador" type="search"
+           placeholder="Buscar artista o álbum..." autocomplete="off">
+    <div class="chips" id="chips-decadas"></div>
+    <select class="selector" id="sel-genero" style="display:none">
+      <option value="">GÉNERO: TODOS</option>
+    </select>
+    <select class="selector" id="sel-pais" style="display:none">
+      <option value="">PAÍS (EDICIÓN): TODOS</option>
+    </select>
+    <button class="btn-azar" id="btn-disco-azar">🎲 DISCO AL AZAR</button>
+    <button class="btn-azar" id="btn-radio">📻 RADIO</button>
+    <div class="contador" id="contador"></div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- ================= VISTA VINILOS ================= -->
+<div id="vista-vinilos" style="display:none">
+  <div class="controles">
+    <input class="buscador" id="buscador-vinilos" type="search"
+           placeholder="Buscar en los vinilos..." autocomplete="off">
+    <div class="contador" id="vinilos-status"></div>
+  </div>
+  <div class="grid" id="grid-vinilos"></div>
+</div>
+
+<!-- ================= VISTA LAST.FM ================= -->
+<div id="vista-lastfm" style="display:none">
+  <div class="lf-cols">
+    <div><h3 class="lf-h">ESCUCHADO RECIENTEMENTE</h3><div id="lf-recientes"></div></div>
+    <div><h3 class="lf-h">TOP ÁLBUMES · ÚLTIMO MES</h3><div id="lf-top"></div></div>
+    <div><h3 class="lf-h">FAVORITAS ❤</h3><div id="lf-loved"></div></div>
+  </div>
+</div>
+
+<!-- ================= VISTA PLAYER ================= -->
+<div id="vista-player">
+  <div class="barra-superior">
+    <button class="volver" id="btn-volver">← LA DISCOTECA</button>
+    <div class="titulo-album" id="titulo-album"></div>
+    <button class="volver" id="btn-guardar" style="display:none;color:var(--ambar);border-color:var(--ambar)"
+            onclick="guardarEnGitHub()">💾 GUARDAR EN GITHUB</button>
+    <button class="volver" id="btn-eliminar" style="display:none;color:#e06060;border-color:#e06060"
+            onclick="eliminarAlbum()">🗑 ELIMINAR</button>
+  </div>
+
+  <div class="player">
+    <!-- contexto: portada integrada + info -->
+    <div class="contexto">
+      <div class="portada-zona">
+        <img id="portada-img" alt="" style="display:none">
+        <div class="portada-tipo" id="portada-tipo">
+          <b id="pt-titulo"></b><i id="pt-artista"></i>
+        </div>
+        <div class="mini-cd" id="mini-cd"></div>
+      </div>
+      <div class="info-album">
+        <h2 id="info-album"></h2>
+        <h3 id="info-artista"></h3>
+        <div class="meta" id="info-meta"></div>
+        <div class="etiquetas" id="info-etiquetas"></div>
+      </div>
+      <div class="video-zona">
+        <button class="video-toggle" id="video-toggle">
+          <span>VIDEO</span><span id="video-flecha">▾</span>
+        </button>
+        <div id="yt-wrap"><div id="yt-player"></div><iframe id="sc-player" allow="autoplay" style="display:none;width:100%;height:180px;border:0"></iframe></div>
+        <audio id="motor-audio" preload="none" style="display:none"></audio>
+      </div>
+    </div>
+
+    <!-- playlist -->
+    <div class="playlist">
+      <div class="playlist-cab">
+        <span class="c-num">#</span><span class="c-tit">TÍTULO</span><span>DUR</span>
+      </div>
+      <div class="pistas" id="lista"></div>
+    </div>
+
+    <!-- transporte -->
+    <div class="transporte">
+      <div class="linea-seek">
+        <span class="tiempo actual" id="t-actual">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0">
+        <span class="tiempo" id="t-total">0:00</span>
+      </div>
+      <div class="linea-botones">
+        <button class="boton" id="btn-prev" aria-label="Anterior">⏮</button>
+        <button class="boton principal" id="btn-play" aria-label="Play/Pausa">▶</button>
+        <button class="boton" id="btn-stop" aria-label="Stop">⏹</button>
+        <button class="boton" id="btn-next" aria-label="Siguiente">⏭</button>
+        <button class="boton modo" id="btn-shuffle" aria-label="Aleatorio">⤮ ALEATORIO</button>
+        <button class="boton modo" id="btn-repeat" aria-label="Repetir disco">↻ REPETIR</button>
+        <div class="analizador" id="analizador"></div>
+        <div class="vol-zona">
+          <span>VOL</span><input type="range" id="vol" min="0" max="100" value="80">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ======================================================================
+   DATOS · modo producción: fetch('discoteca/indice.json') + fragmentos
+           modo demo: catálogo embebido
+====================================================================== */
+const DATOS_EMBEBIDOS = [{"id": 1, "artista": "The Velvet Underground", "album": "The Velvet Underground", "año": 1969, "portada": "https://i.discogs.com/AmVVcVyaCa3f8gQCiSbeCXDTUwYdjlY8xcaooJyotbI/rs:fit/g:sm/q:90/h:598/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI0OTEy/MTUyLTE2NjY0NzI3/NDUtODc4Ny5qcGVn.jpeg", "tracks": [{"num": 1, "titulo": "Candy Says", "duracion": 244, "videoId": "O4rbTBKRedE"}, {"num": 2, "titulo": "What Goes On", "duracion": 295, "videoId": "AC7xbqmlluo"}, {"num": 3, "titulo": "Some Kinda Love", "duracion": 243, "videoId": "JnYlCBKRLsY"}, {"num": 4, "titulo": "Pale Blue Eyes", "duracion": 342, "videoId": "aNSH8OdHx2A"}, {"num": 5, "titulo": "Jesus", "duracion": 205, "videoId": "_quyxI4hIOk"}, {"num": 6, "titulo": "Beginning to See the Light", "duracion": 281, "videoId": "jRAFf2oePMM"}, {"num": 7, "titulo": "I’m Set Free", "duracion": 249, "videoId": "Nea2I1dQmLE"}, {"num": 8, "titulo": "That’s The Story of My Life", "duracion": 120, "videoId": "9wLxsLclqy4"}, {"num": 9, "titulo": "The Murder Mystery", "duracion": 536, "videoId": "Om1CYWChLbk"}, {"num": 10, "titulo": "After Hours", "duracion": 128, "videoId": "__-O3Bj74x4"}]}, {"id": 2, "artista": "Carmen", "album": "Fandangos in Space", "año": 1973, "portada": "https://i.discogs.com/pB5LF1kHLaFOzwl8hh0qoFxGTrXEfKTgu9JLoPWGvpI/rs:fit/g:sm/q:90/h:600/w:592/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0MjMx/NDk1LTE1NzExNDMx/ODUtODgzMy5qcGVn.jpeg", "tracks": [{"num": 1, "titulo": "Bulerias", "duracion": 325, "videoId": "PPjIq7ebCiA"}, {"num": 2, "titulo": "Bullfight", "duracion": 290, "videoId": "1hFVtl6n76M"}, {"num": 3, "titulo": "Stepping Stone", "duracion": 175, "videoId": "aseOGf-vdmM"}, {"num": 4, "titulo": "Sailor Song", "duracion": 318, "videoId": "Z4EqH5nntxc"}, {"num": 5, "titulo": "Lonely House", "duracion": 254, "videoId": "6MJkPXMMgjA"}, {"num": 6, "titulo": "Por Tarantos", "duracion": 105, "videoId": "tiTwJb9Nn4A"}, {"num": 7, "titulo": "Looking Outside (My Window)", "duracion": 274, "videoId": "FZreO0MPPn4"}, {"num": 8, "titulo": "Tales of Spain", "duracion": 323, "videoId": "FGjP7bP2Fgg"}, {"num": 9, "titulo": "Retirando", "duracion": 133, "videoId": "5aPrmJ798as"}, {"num": 10, "titulo": "Fandangos in Space", "duracion": 310, "videoId": "aNDSM4l86O4"}, {"num": 11, "titulo": "Reprise - Finale", "duracion": 180, "videoId": "fDLHgDLaryA"}]}, {"id": 3, "artista": "Alicia de Larrocha - Topic", "album": "[Unknown Album]", "año": 2014, "portada": null, "tracks": [{"num": -1, "titulo": "Sonata Española: I. Andante Romántico", "duracion": 418, "videoId": "qqkuItrZm4w"}]}, {"id": 4, "artista": "Various Artists", "album": "Anthologie de la chanson française enregistrée : 1931", "año": 1992, "portada": null, "tracks": [{"num": 1, "titulo": "Sous la blafarde", "duracion": 197, "videoId": "bsCpior78SA"}, {"num": 2, "titulo": "Tu m’oublieras", "duracion": 164, "videoId": "e6g3z4CrhlA"}, {"num": 3, "titulo": "Le Grand Frisé", "duracion": 171, "videoId": "SfpaS03AxwY"}, {"num": 4, "titulo": "Le Tango des fauvettes", "duracion": 194, "videoId": "uETrKKY7n-E"}, {"num": 5, "titulo": "Rodeuse de barrière", "duracion": 177, "videoId": "ot3p9NVhJ0M"}, {"num": 6, "titulo": "La Légende des flots bleus", "duracion": 199, "videoId": "wEtvbdgL-dc"}, {"num": 7, "titulo": "La Complainte de Mackie", "duracion": 196, "videoId": "jSWdR5dcvwY"}, {"num": 8, "titulo": "Le Chant de Barbara", "duracion": 224, "videoId": "xXugbpLK5Vg"}, {"num": 9, "titulo": "Pedro", "duracion": 168, "videoId": "5WXs6hzsuZs"}, {"num": 10, "titulo": "Un vieux farceur", "duracion": 171, "videoId": "FqU7rPlgieI"}, {"num": 11, "titulo": "Voulez-vous de la canne à sucre ?", "duracion": 178, "videoId": "cVNTvbO21ZU"}, {"num": 12, "titulo": "J’ai des touches", "duracion": 170, "videoId": "irf1Frq4FvQ"}, {"num": 13, "titulo": "Pot-pourri d’Alain Gerbault", "duracion": 508, "videoId": "PURcPZjqSr4"}, {"num": 14, "titulo": "La Ronde des heures", "duracion": 157, "videoId": "5GGyqd0W6iI"}, {"num": 15, "titulo": "L’Âme des violons", "duracion": 201, "videoId": "4BlGKhXLxlI"}, {"num": 16, "titulo": "Si l’on ne s’était pas connu", "duracion": 176, "videoId": "iubWxOQfLhw"}, {"num": 17, "titulo": "Les Gars de la marine", "duracion": 166, "videoId": "2QK6Dh78Pe4"}, {"num": 18, "titulo": "La Môme caoutchouc", "duracion": 145, "videoId": "ZCBx7xUwv84"}, {"num": 19, "titulo": "Avoir un bon copain", "duracion": 155, "videoId": "u9_b9m2KgHs"}, {"num": 20, "titulo": "Serait-ce un rêve ?", "duracion": 213, "videoId": "mQ7bMZ2ij8U"}, {"num": 21, "titulo": "Couchés dans le foin", "duracion": 196, "videoId": "HG-le_Jo1JA"}, {"num": 22, "titulo": "Les P’tits Pois", "duracion": 196, "videoId": "7gyck7GEUp8"}, {"num": 23, "titulo": "La Vigne aux moineaux", "duracion": 197, "videoId": "oAi_MpnMKQY"}]}, {"id": 5, "artista": "Joe Driscoll", "album": "Faya", "año": 2012, "portada": "https://i.discogs.com/EAkiF47y2bjJWCWoiA2a_2p7ot2E8B3jf15LYlVdV2c/rs:fit/g:sm/q:90/h:600/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTU1Mjg0/NDUtMTM5Njc0MjM5/NC00MjY2LmpwZWc.jpeg", "tracks": [{"num": 1, "titulo": "Tanama", "duracion": 207, "videoId": "kXlwnFdQyns"}, {"num": 2, "titulo": "Passport", "duracion": 225, "videoId": "PHKeDB6U7Vo"}, {"num": 3, "titulo": "Faya", "duracion": 215, "videoId": "9AMh4SfZyy4"}, {"num": 4, "titulo": "Lady", "duracion": 216, "videoId": "BgPqsr8fzfY"}, {"num": 5, "titulo": "Ghetto Many", "duracion": 248, "videoId": "8mNbW01-0c8"}, {"num": 6, "titulo": "Birnakely", "duracion": 196, "videoId": "vwxHnKyZeP0"}, {"num": 7, "titulo": "Wonamati", "duracion": 189, "videoId": "lx7P3j-Qd0Y"}, {"num": 8, "titulo": "New York", "duracion": 203, "videoId": "sY0ROI_AwPU"}, {"num": 9, "titulo": "Zion", "duracion": 210, "videoId": "N-7ambPsQyk"}]}, {"id": 6, "artista": "Howlin’ Wolf", "album": "London Sessions", "año": 1971, "portada": "https://i.discogs.com/dzvuVpZrhsOKX7RydacvzpCkIjeug21xDRQG16Um-o8/rs:fit/g:sm/q:90/h:600/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTYyNzkz/NTItMTQxNTQ2MTk0/Ny05MzczLmpwZWc.jpeg", "tracks": [{"num": 1, "titulo": "Rockin' Daddy", "duracion": 219, "videoId": "KLB6oJmBRfc"}, {"num": 2, "titulo": "I Ain't Superstitious", "duracion": 201, "videoId": "bNv7qOWNh7M"}, {"num": 3, "titulo": "Sittin' on Top of the World", "duracion": 225, "videoId": "K1LAl1xLC0g"}, {"num": 5, "titulo": "What a Woman", "duracion": 173, "videoId": "Djs31Vdh0Zs"}, {"num": 6, "titulo": "Poor Boy", "duracion": 178, "videoId": "FsagiHRjaHY"}, {"num": 7, "titulo": "Built for Comfort", "duracion": 126, "videoId": "VoO1q5KSi6w"}, {"num": 8, "titulo": "Who's Been Talking", "duracion": 179, "videoId": "fX0sgKmSZ34"}, {"num": 10, "titulo": "Little Red Rooster", "duracion": 232, "videoId": "M95tCfMxwiM"}, {"num": 11, "titulo": "Do the Do", "duracion": 136, "videoId": "iDNK34nZWPk"}, {"num": 12, "titulo": "Highway 49", "duracion": 164, "videoId": "_DqNKXNsTBM"}, {"num": 13, "titulo": "Wang-Dang-Doodle", "duracion": 264, "videoId": "J0HfN6GvK08"}, {"num": 15, "titulo": "Smokestack Lightnin'", "duracion": 186, "videoId": "VMUt8KdDtTY"}, {"num": 16, "titulo": "Back Door Man", "duracion": 169, "videoId": "we3xngKRozE"}, {"num": 17, "titulo": "Killing Floor", "duracion": 170, "videoId": "q4KjjCwecco"}]}, {"id": 7, "artista": "Giorgio Moroder", "album": "Evolution", "año": 1994, "portada": "https://i.discogs.com/W6nAltIR2R65T2aKZKpF7LTSOJIO140m2ErAua3m3-w/rs:fit/g:sm/q:90/h:595/w:590/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE1MjM1/NC0xMTQ3ODkxMDkx/LmpwZWc.jpeg", "tracks": [{"num": 1, "titulo": "Evolution (Roger Sanchez Extra Terrestrial mix)", "duracion": 452, "videoId": "UG4eDV8ofzk"}, {"num": 2, "titulo": "Love to Love You (Marcel Krieg disco mix)", "duracion": 426, "videoId": "gPuRDv9_vsY"}]}, {"id": 8, "artista": "Curumin", "album": "Arrocha", "año": 2012, "portada": "https://i.discogs.com/7zVc2Npr7V6r7yrXIkBaeoW88qY2921YF8Hx3kEtx9k/rs:fit/g:sm/q:90/h:532/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTEyNTY3/Mjg4LTE2MDc1Mzc1/NjQtODY5OC5qcGVn.jpeg", "tracks": [{"num": 1, "titulo": "Afoxoque", "duracion": 197, "videoId": "fcE5n2zSlFM"}, {"num": 2, "titulo": "Selvage", "duracion": 202, "videoId": "-PKiZK_M_K0"}, {"num": 3, "titulo": "Treme Terra", "duracion": 255, "videoId": "eZaw5eWq_vk"}, {"num": 4, "titulo": "Passarinho", "duracion": 203, "videoId": "yUVh_v3Qihg"}, {"num": 5, "titulo": "Paris Vila Matilde", "duracion": 132, "videoId": "zhLtP9L2GYU"}, {"num": 6, "titulo": "Tupanzinho Guerreiro", "duracion": 141, "videoId": "a7fmLZH262k"}, {"num": 7, "titulo": "Vestido De Prata", "duracion": 251, "videoId": "gAnXqnQ0Tus"}, {"num": 8, "titulo": "Doce", "duracion": 191, "videoId": "6JGfd3fqMpA"}, {"num": 9, "titulo": "Blimblim", "duracion": 14, "videoId": "LjqgHzDyaDY"}, {"num": 10, "titulo": "blinblin", "duracion": 114, "videoId": "LjqgHzDyaDY"}, {"num": 10, "titulo": "Sapo Cururu", "duracion": 79, "videoId": "-eA-cLIwG8A"}, {"num": 11, "titulo": "Acorda", "duracion": 123, "videoId": "NpGLY2lLEQQ"}, {"num": 12, "titulo": "Pra Nunca Mais", "duracion": 151, "videoId": "XIjury5lQyE"}, {"num": 13, "titulo": "Bambora!", "duracion": 61, "videoId": "nQYLN8iEaxo"}]}, {"id": 9, "artista": "Various Artists", "album": "American Punk Obscurities, Vol. 4", "año": 1980, "portada": null, "tracks": [{"num": 1, "titulo": "Iran From Iran", "duracion": 131, "videoId": "pYxOzIvug9c"}, {"num": 1, "titulo": "Laugh", "duracion": 194, "videoId": "Bvzdtn43vnI"}, {"num": 1, "titulo": "Be On Top", "duracion": 172, "videoId": "ojGXx12GEvU"}, {"num": 1, "titulo": "Busy Kids", "duracion": 143, "videoId": "UtkpTIXV3Sk"}, {"num": 1, "titulo": "I Hate Music", "duracion": 133, "videoId": "60KgpaoP6lQ"}, {"num": 1, "titulo": "You Can Borrow My Car", "duracion": 135, "videoId": "pjmxxLLJKG4"}, {"num": 2, "titulo": "America", "duracion": 77, "videoId": "JXHCXfCskok"}, {"num": 2, "titulo": "Better Off Dead", "duracion": 187, "videoId": "xl-9PTeWGzg"}, {"num": 2, "titulo": "Gypsy Lid", "duracion": 109, "videoId": "8Izg2fDBt8M"}, {"num": 2, "titulo": "Get Out", "duracion": 80, "videoId": "2K3ngZTQAEU"}, {"num": 2, "titulo": "Catholic Love", "duracion": 86, "videoId": "12TKTymwsPE"}, {"num": 2, "titulo": "Descending Shadows", "duracion": 95, "videoId": "uoJ6riJ6BF4"}, {"num": 3, "titulo": "Disneyland", "duracion": 123, "videoId": null}, {"num": 3, "titulo": "Hillside Strangler", "duracion": 114, "videoId": "0Yt4Qd7GiNc"}, {"num": 3, "titulo": "Communist Radio", "duracion": 97, "videoId": "11Lvcjc-LvI"}, {"num": 3, "titulo": "Can't Control Myself", "duracion": 107, "videoId": "igZ-r-Nci_o"}, {"num": 3, "titulo": "Let's Go Bowling", "duracion": 184, "videoId": null}, {"num": 3, "titulo": "Tonight We Fight", "duracion": 108, "videoId": "U08FO-Xaya0"}, {"num": 4, "titulo": "Living Downtown", "duracion": 130, "videoId": "d8RMGKAyPTk"}, {"num": 4, "titulo": "Kill The Hostages", "duracion": 112, "videoId": "dHG-LhX1pVQ"}, {"num": 4, "titulo": "Knife Manual", "duracion": 109, "videoId": "rW74itO1dHk"}, {"num": 4, "titulo": "I Don't Wanna Dance (With You)", "duracion": 103, "videoId": "5IyZqw8UHHc"}, {"num": 4, "titulo": "Almost Ready", "duracion": 143, "videoId": "lWnk-y_ajs0"}, {"num": 4, "titulo": "Memory", "duracion": 64, "videoId": "3nLFzAyGl6A"}, {"num": 5, "titulo": "TAQN", "duracion": 116, "videoId": null}, {"num": 5, "titulo": "Alcoholiday", "duracion": 158, "videoId": "-2Z0YzRxRXw"}, {"num": 5, "titulo": "Drive My Car", "duracion": 29, "videoId": "0L6D80K04OQ"}, {"num": 5, "titulo": "Rockin' Right", "duracion": 105, "videoId": "ze_K4US9uS8"}, {"num": 5, "titulo": "Kill Yourself", "duracion": 126, "videoId": "g5sukHe4A3A"}, {"num": 5, "titulo": "Problem Child", "duracion": 177, "videoId": "spgY3aZtZuU"}, {"num": 6, "titulo": "No Talk In The 80's", "duracion": 134, "videoId": "gyylOo9h2Rg"}, {"num": 6, "titulo": "The Right To Be Poor and Radical", "duracion": 87, "videoId": "kGX7Ny4Vwj4"}, {"num": 6, "titulo": "Time Is Mine", "duracion": 157, "videoId": "OimyKIusA_k"}, {"num": 6, "titulo": "Are You Into Destruction?", "duracion": 103, "videoId": "PBbM1sJICls"}, {"num": 6, "titulo": "Attitudes", "duracion": 117, "videoId": "v2XHeF1XeAk"}, {"num": 6, "titulo": "Is It Late?", "duracion": 149, "videoId": "jJfQpLGx8YA"}, {"num": 7, "titulo": "Betsy Ross", "duracion": 108, "videoId": "Mlc8FTIqvoE"}, {"num": 7, "titulo": "I Wanna Be Rich", "duracion": 200, "videoId": "LJms23FORmk"}, {"num": 7, "titulo": "I Let Jenny Ride", "duracion": 155, "videoId": "2z7NNsVDUr0"}, {"num": 7, "titulo": "Want Me", "duracion": 145, "videoId": "23LWWhLdHI4"}, {"num": 7, "titulo": "Number One Again", "duracion": 167, "videoId": "-mxHGrCHtVg"}, {"num": 7, "titulo": "Los Angeles", "duracion": 145, "videoId": "efOJs-K9kxY"}, {"num": 8, "titulo": "X-Patriots", "duracion": 116, "videoId": "x2aHbwTmIoU"}, {"num": 8, "titulo": "On Whom They Beat", "duracion": 89, "videoId": "B_HSa1dEL9s"}, {"num": 8, "titulo": "Back To Bataan", "duracion": 148, "videoId": null}, {"num": 8, "titulo": "Teenage Lobotomy", "duracion": 122, "videoId": "_ABjFQoTO34"}, {"num": 8, "titulo": "Constitution", "duracion": 176, "videoId": "NEbAEHjlNeQ"}, {"num": 8, "titulo": "Government", "duracion": 94, "videoId": "pRwrqZ6_Y5g"}, {"num": 9, "titulo": "10 Time Change", "duracion": 134, "videoId": "MFOX5HcKQO4"}, {"num": 9, "titulo": "Danger Boy", "duracion": 135, "videoId": "d2MbSgw7nXc"}, {"num": 9, "titulo": "Bad Habits", "duracion": 178, "videoId": "YCl7m0upRnw"}, {"num": 9, "titulo": "Babylonian Gorgon", "duracion": 152, "videoId": "aVv3NmwCuxE"}, {"num": 9, "titulo": "We Will Bury You", "duracion": 115, "videoId": "rcF4bsCAVkg"}, {"num": 9, "titulo": "She's in Love With the Rolling Stones", "duracion": 173, "videoId": null}, {"num": 10, "titulo": "You Really Dont Wanna Know", "duracion": 101, "videoId": "APGBRDeqsSI"}, {"num": 10, "titulo": "Kill Me", "duracion": 72, "videoId": "cUzjusskR8Y"}, {"num": 10, "titulo": "Kill The Bee Gees", "duracion": 174, "videoId": "4U-ppT14Bng"}, {"num": 10, "titulo": "Disposable", "duracion": 122, "videoId": "BOzZuj4RwQo"}, {"num": 10, "titulo": "She's Hi-Fi", "duracion": 135, "videoId": "3ssxw3wPmTk"}, {"num": 10, "titulo": "Social Circle", "duracion": 159, "videoId": "KvMgOsPKgxE"}, {"num": 11, "titulo": "Test Tube Baby", "duracion": 133, "videoId": "FqWHajQ-_Bs"}, {"num": 11, "titulo": "Cops", "duracion": 144, "videoId": "PV_-OtrZLv8"}, {"num": 11, "titulo": "Modern Machine", "duracion": 88, "videoId": "OyXUbaxrjDk"}, {"num": 11, "titulo": "Let's Shoot Maria", "duracion": 140, "videoId": "rzXHLcXWNvI"}, {"num": 11, "titulo": "Livin' Fast", "duracion": 130, "videoId": "doqIyJhUifU"}, {"num": 11, "titulo": "Laurie's Lament", "duracion": 97, "videoId": "PliJQCQhw0c"}, {"num": 12, "titulo": "Let's Get Rid Of New York", "duracion": 162, "videoId": "LYRXMPUOTCA"}, {"num": 12, "titulo": "Violent Days", "duracion": 129, "videoId": "WjTZ7NkIhPg"}, {"num": 12, "titulo": "Sudden Fun", "duracion": 99, "videoId": "UbD5BT8AOhk"}, {"num": 12, "titulo": "Dont Be Afraid to Pogo", "duracion": 85, "videoId": "7FCPnYXprtA"}, {"num": 12, "titulo": "Taking The City By Storm", "duracion": 135, "videoId": "Y3teTzje4YM"}, {"num": 12, "titulo": "Foundry Joe", "duracion": 101, "videoId": "GSwepuV_jDU"}, {"num": 13, "titulo": "Big Doings", "duracion": 171, "videoId": null}, {"num": 13, "titulo": "Guns Of Revolution", "duracion": 118, "videoId": "cIkKgcr1o7s"}, {"num": 13, "titulo": "Before I'm Done", "duracion": 197, "videoId": "4HNZnF-6fWw"}, {"num": 13, "titulo": "White Stains", "duracion": 163, "videoId": "tHnljMnE61E"}, {"num": 13, "titulo": "Loud Fast Rules", "duracion": 191, "videoId": "F1tcqN4E0zI"}, {"num": 13, "titulo": "N.Y. Ripper", "duracion": 116, "videoId": "pNLEZd6jAlk"}, {"num": 14, "titulo": "Radiation Sickness", "duracion": 148, "videoId": "YYTZ4oVwJwY"}, {"num": 14, "titulo": "Action", "duracion": 168, "videoId": "6uPgiArIAPw"}, {"num": 14, "titulo": "All Right", "duracion": 41, "videoId": "4owcvtjNQAE"}, {"num": 14, "titulo": "Read Like A Book", "duracion": 97, "videoId": "-O5rjWZE7bA"}, {"num": 14, "titulo": "I Hate The Rich", "duracion": 100, "videoId": "S-yVzKWsxyg"}, {"num": 14, "titulo": "Midget", "duracion": 142, "videoId": "gFQ6mmvv750"}, {"num": 15, "titulo": "Russian Sex", "duracion": 90, "videoId": "MDv8CII9vQE"}, {"num": 15, "titulo": "Topological Lies", "duracion": 95, "videoId": "ngDeS_uyC6Y"}, {"num": 15, "titulo": "I Don't Know Right From Worng", "duracion": 148, "videoId": null}, {"num": 15, "titulo": "Don't Tell Me Why", "duracion": 107, "videoId": "UMMqNfeN9zw"}, {"num": 15, "titulo": "Gigantor", "duracion": 151, "videoId": "XVLTAxRQwx4"}, {"num": 15, "titulo": "You're Not Blank", "duracion": 97, "videoId": null}, {"num": 16, "titulo": "Intellectual Morons", "duracion": 140, "videoId": "Erv1T0Kv0CU"}, {"num": 16, "titulo": "Headliner", "duracion": 139, "videoId": "FGAfXA4IyAw"}, {"num": 16, "titulo": "Stage Speech", "duracion": 185, "videoId": "Aa5prADvnsM"}, {"num": 16, "titulo": "Too Much Junk", "duracion": 162, "videoId": "H3eHkx9rygc"}, {"num": 16, "titulo": "Drug City", "duracion": 139, "videoId": "bqYBnkqBPEo"}, {"num": 16, "titulo": "Out Tonight", "duracion": 126, "videoId": "P2WSYsz5dCQ"}, {"num": 17, "titulo": "Don't Come Cryin' To Me", "duracion": 161, "videoId": "Evt0JcbTYbU"}, {"num": 17, "titulo": "I Didn't Get It", "duracion": 85, "videoId": "A7dt300aeV4"}, {"num": 17, "titulo": "Life Is Cheap", "duracion": 86, "videoId": "CA0gNSDQLm0"}, {"num": 17, "titulo": "Gacy's Place", "duracion": 88, "videoId": "YbTpBxPCHXQ"}, {"num": 17, "titulo": "Let's Have Some Fun", "duracion": 138, "videoId": "YnvyYI7iP_E"}, {"num": 17, "titulo": "Return of the Rat", "duracion": 157, "videoId": "yxgN2nbs37Q"}, {"num": 18, "titulo": "We Need More Power", "duracion": 166, "videoId": "Wh8tMDgWi44"}, {"num": 18, "titulo": "I'm Not Your Whore", "duracion": 166, "videoId": "t8F2gFK7AI8"}, {"num": 18, "titulo": "No Judy", "duracion": 126, "videoId": "zhZwx4G90C0"}, {"num": 18, "titulo": "Slash Your Face", "duracion": 227, "videoId": "sz8Tz35vBFQ"}, {"num": 18, "titulo": "No Condition", "duracion": 168, "videoId": "qHaCp5mfkSg"}, {"num": 18, "titulo": "The Consumer", "duracion": 140, "videoId": "VfCyO3NnfUE"}, {"num": 19, "titulo": "Ultimate Orgasm", "duracion": 177, "videoId": "b2y1zwr49xA"}, {"num": 19, "titulo": "No Good", "duracion": 100, "videoId": "dXGlPwT_gDc"}, {"num": 19, "titulo": "What We Do", "duracion": 192, "videoId": "FUypG0l2X50"}, {"num": 19, "titulo": "Move it", "duracion": 76, "videoId": null}, {"num": 19, "titulo": "Super Destroyer Mark II", "duracion": 147, "videoId": "4zQR3KHYmB0"}, {"num": 19, "titulo": "Of The City", "duracion": 218, "videoId": "dSAnrzVFe8I"}, {"num": 20, "titulo": "Hyper Exaggeration", "duracion": 230, "videoId": "_GDoCWfcEpo"}, {"num": 20, "titulo": "The Badge Means You Suck", "duracion": 233, "videoId": null}, {"num": 20, "titulo": "I Want To Die Young", "duracion": 164, "videoId": "-4PZmqmI9Ps"}, {"num": 20, "titulo": "Reason To Whine", "duracion": 88, "videoId": "5ofd-tWAk-U"}, {"num": 20, "titulo": "In Society", "duracion": 139, "videoId": "wC5fK4bIJ6s"}, {"num": 20, "titulo": "Catastrophe", "duracion": 122, "videoId": "bZIoGuRqN50"}, {"num": 21, "titulo": "Going Outside", "duracion": 145, "videoId": "wIpfDynphQQ"}, {"num": 21, "titulo": "Unconventional Boy", "duracion": 104, "videoId": null}, {"num": 21, "titulo": "I Hate Tourists", "duracion": 150, "videoId": "rCB7ZEXW_dI"}, {"num": 21, "titulo": "Who Needs Wildlife Anyway", "duracion": 113, "videoId": "FmYWfmPAjUk"}, {"num": 21, "titulo": "Complicated Fun", "duracion": 150, "videoId": "T1F-69E55yo"}, {"num": 21, "titulo": "TV's On", "duracion": 225, "videoId": null}, {"num": 22, "titulo": "Nazi School", "duracion": 162, "videoId": "P7cXkhw2YRY"}, {"num": 22, "titulo": "Let Go", "duracion": 94, "videoId": "6o5VDm27qSo"}, {"num": 22, "titulo": "Gimme Some", "duracion": 144, "videoId": "2LumsH706Dg"}, {"num": 22, "titulo": "A Sign of the Times", "duracion": 178, "videoId": "oHVVoe2Vj8s"}, {"num": 22, "titulo": "Cannibals", "duracion": 171, "videoId": "JEfO46EV1v0"}, {"num": 22, "titulo": "Johnny Hit And Run Paulene", "duracion": 167, "videoId": "lpOsSc_y20g"}, {"num": 23, "titulo": "Frustration", "duracion": 138, "videoId": "B3EflA5NHho"}, {"num": 23, "titulo": "Just Head", "duracion": 120, "videoId": "Rah6N8MoKo8"}, {"num": 23, "titulo": "Tatum O' Tot and The Fried Vegetables", "duracion": 92, "videoId": "mc9Ak2lxCOs"}, {"num": 23, "titulo": "Job", "duracion": 108, "videoId": null}, {"num": 23, "titulo": "Itchy Bugs", "duracion": 201, "videoId": "jx1OG9zsKZI"}, {"num": 23, "titulo": "Laughing Lover", "duracion": 147, "videoId": "S1U7iMkxn1U"}, {"num": 24, "titulo": "Eniwetok", "duracion": 119, "videoId": "bs2-apDKg24"}, {"num": 24, "titulo": "Chop Up Your Mother", "duracion": 75, "videoId": "l3_LUpCK_hc"}, {"num": 24, "titulo": "Mystery Girl", "duracion": 136, "videoId": "O5wzX16d3B8"}, {"num": 24, "titulo": "Hard Rock", "duracion": 101, "videoId": null}, {"num": 24, "titulo": "Stiff Love", "duracion": 97, "videoId": null}, {"num": 24, "titulo": "The Loser", "duracion": 150, "videoId": "x1Vb9w6PJ_o"}, {"num": 25, "titulo": "Uncircumcised Twin", "duracion": 76, "videoId": null}, {"num": 25, "titulo": "Radiation", "duracion": 89, "videoId": "jBCsHn-3hJQ"}, {"num": 25, "titulo": "We Are The One", "duracion": 159, "videoId": "mIqhl0rH0Wc"}, {"num": 25, "titulo": "Trendy Violence", "duracion": 132, "videoId": "NYgZi5N2Lc0"}, {"num": 25, "titulo": "Cold Eyes", "duracion": 131, "videoId": "SHqM1eu2eNI"}, {"num": 25, "titulo": "Do Dead People Tan", "duracion": 173, "videoId": "6RCpwdtiP1Y"}, {"num": 26, "titulo": "Nothing Special", "duracion": 146, "videoId": "1MQzIYwjXqQ"}, {"num": 26, "titulo": "Tell Me The Rules", "duracion": 165, "videoId": "O6_bMmmJPU8"}, {"num": 26, "titulo": "Supergirl", "duracion": 104, "videoId": "ezo6gmZmVSs"}, {"num": 26, "titulo": "Sink The Whales (Buy Japanese Goods)", "duracion": 133, "videoId": "DqLrKEcTG0g"}, {"num": 26, "titulo": "Do You Wanna?", "duracion": 131, "videoId": "lqb6AwasNsA"}, {"num": 26, "titulo": "Break Out Tonight", "duracion": 97, "videoId": "a5l1h6XWmkc"}, {"num": 27, "titulo": "Small Talk", "duracion": 110, "videoId": "BsGKl9Zq4W8"}, {"num": 27, "titulo": "I Gave My Punk Jacket", "duracion": 137, "videoId": "aOos1uHBnZA"}, {"num": 27, "titulo": "Sorry About That Chief!", "duracion": 135, "videoId": "Nk42W68ZK3s"}, {"num": 27, "titulo": "Disco Queen", "duracion": 118, "videoId": "fK9GyDhOv5g"}, {"num": 27, "titulo": "Search & Destroy", "duracion": 213, "videoId": "9Onl0txCVg4"}, {"num": 27, "titulo": "Submind", "duracion": 169, "videoId": "kLmJumBZyUg"}, {"num": 28, "titulo": "Fly By Night", "duracion": 167, "videoId": "U_dUunGisMo"}, {"num": 28, "titulo": "Enemy Man", "duracion": 156, "videoId": "vxa8ShIm9yw"}, {"num": 28, "titulo": "Afraid Of The Russians", "duracion": 133, "videoId": "u3RPHfogY9I"}, {"num": 28, "titulo": "Rock & Roll Don't Come From New York", "duracion": 106, "videoId": "idJQCcAL_Xk"}, {"num": 28, "titulo": "I Don't Need You", "duracion": 136, "videoId": "nkkWWPGwnIE"}, {"num": 28, "titulo": "Mindless Contentment", "duracion": 121, "videoId": "4xz7xZ4WJa8"}, {"num": 29, "titulo": "I Wanna Kill James Taylor", "duracion": 170, "videoId": null}, {"num": 29, "titulo": "I'm Trouble", "duracion": 127, "videoId": "OslTzqZg_o8"}, {"num": 29, "titulo": "I Can't Kick", "duracion": 160, "videoId": "zsfL9G8Jw3o"}, {"num": 29, "titulo": "Right Time", "duracion": 152, "videoId": "aHWSIVUdCI4"}, {"num": 29, "titulo": "Pushin' Too Hard", "duracion": 77, "videoId": "qadeajSG8bA"}, {"num": 29, "titulo": "Run My Life", "duracion": 97, "videoId": "RLmkw0_yJG4"}, {"num": 30, "titulo": "Kids Gonna Do It", "duracion": 205, "videoId": "eoAjfbGTQGY"}, {"num": 30, "titulo": "Dead in the Suburbs", "duracion": 170, "videoId": "2XGj5EqNZE8"}, {"num": 30, "titulo": "I Really Don't Think So", "duracion": 151, "videoId": "1C48yzpNM3Q"}, {"num": 30, "titulo": "Going Out With The In-Crowd", "duracion": 161, "videoId": "IHbbIwlmezo"}, {"num": 30, "titulo": "Get It For Less", "duracion": 130, "videoId": "BzR9whp1fDM"}, {"num": 30, "titulo": "My Kinda Town", "duracion": 124, "videoId": "iK_CL7sr018"}, {"num": 31, "titulo": "Amerikan Story", "duracion": 181, "videoId": "lAnidSPt9Vs"}, {"num": 31, "titulo": "Bummer Bitch", "duracion": 98, "videoId": "2QTodGqYo30"}, {"num": 31, "titulo": "Teenage Jerk-Off", "duracion": 155, "videoId": "UnVshvwOyBo"}, {"num": 31, "titulo": "Sexual Object", "duracion": 148, "videoId": "bYUoOk-mq1o"}, {"num": 31, "titulo": "Back To Life", "duracion": 178, "videoId": "7M-ookG95c8"}, {"num": 31, "titulo": "I Want Head", "duracion": 197, "videoId": "FU6hKXqha0M"}, {"num": 32, "titulo": "Does She or Doesn't She?", "duracion": 102, "videoId": "TGcvKeuDOfk"}, {"num": 32, "titulo": "Jeffrey (Where Are You Now)", "duracion": 166, "videoId": null}, {"num": 32, "titulo": "This Generation On Vacation", "duracion": 106, "videoId": "3QrILdkszYw"}, {"num": 32, "titulo": "Floozie Of The Neighborhood", "duracion": 125, "videoId": "QwSVGor0zII"}, {"num": 32, "titulo": "Neutron Bomb", "duracion": 179, "videoId": "cdltlVegG8U"}, {"num": 32, "titulo": "Solitary Confinement", "duracion": 148, "videoId": "fkw3G3l_DZ4"}, {"num": 33, "titulo": "Los Little Girls", "duracion": 163, "videoId": "H_WjOg_eydg"}, {"num": 33, "titulo": "Out Of Order", "duracion": 102, "videoId": "kGKtNWw8JKI"}, {"num": 33, "titulo": "Useless Eater", "duracion": 115, "videoId": "0nuaismISPU"}, {"num": 33, "titulo": "Civilization's Dying", "duracion": 118, "videoId": "lqT3JcIgDj0"}, {"num": 34, "titulo": "I Was There at the Texas Chainsaw Massacre", "duracion": 213, "videoId": "6vWjry1VBWo"}, {"num": 34, "titulo": "Magazine Look", "duracion": 132, "videoId": "4H0Edn1McaI"}, {"num": 34, "titulo": "Not Acceptable", "duracion": 175, "videoId": "1NHUkWrZdms"}, {"num": 34, "titulo": "No Ambition", "duracion": 115, "videoId": "haDqbspEIuQ"}, {"num": 35, "titulo": "Cant Stand the Midwest", "duracion": 86, "videoId": "x6bx6W_Q00k"}, {"num": 35, "titulo": "War Hero", "duracion": 112, "videoId": "_HBju-oHf3Y"}, {"num": 36, "titulo": "(Let's Get, Let's Get) Tammy Wynette", "duracion": 92, "videoId": null}]}, {"id": 10, "artista": "Camarón de la Isla", "album": "Camarón en directo Peña el Taranto de Almeria", "año": 1977, "portada": null, "tracks": [{"num": -1, "titulo": "Alegrias", "duracion": 427, "videoId": "UY-eVOkuyuU"}, {"num": -1, "titulo": "Buleria por Solea", "duracion": 328, "videoId": "QY5BNybgu2Y"}, {"num": -1, "titulo": "Bulerias 1", "duracion": 464, "videoId": "QY5BNybgu2Y"}, {"num": -1, "titulo": "Bulerias 2", "duracion": 394, "videoId": "QY5BNybgu2Y"}, {"num": -1, "titulo": "Bulerias 3", "duracion": 418, "videoId": "p1fSveQmSsw"}, {"num": -1, "titulo": "Fandangos", "duracion": 311, "videoId": "iTY-kBS3n78"}, {"num": -1, "titulo": "Malagueña", "duracion": 332, "videoId": null}, {"num": -1, "titulo": "Seguiriyas", "duracion": 442, "videoId": null}, {"num": -1, "titulo": "Tangos 1", "duracion": 282, "videoId": "rYlKLMwMaIE"}, {"num": -1, "titulo": "Tangos 2", "duracion": 330, "videoId": "_GdWyFx9ss0"}, {"num": -1, "titulo": "Tarantos", "duracion": 263, "videoId": "mf73UKRwbwE"}, {"num": -1, "titulo": "Tientos", "duracion": 386, "videoId": "mf73UKRwbwE"}]}, {"id": 11, "artista": "Various Artists", "album": "[Unknown Album]", "año": null, "portada": null, "tracks": [{"num": -1, "titulo": "Barbarito Diez - Bajo un palmar", "duracion": 179, "videoId": "l80gcRh7Dzo"}, {"num": -1, "titulo": "Como arrullo de palmas", "duracion": 163, "videoId": "zEPOpInuXNA"}, {"num": -1, "titulo": "Las perlas de tu boca", "duracion": 167, "videoId": "I0eeSmFHEDw"}, {"num": -1, "titulo": "Lágrimas negras", "duracion": 186, "videoId": "F5nkGX91Hrk"}, {"num": -1, "titulo": "Ojos Malvados", "duracion": 160, "videoId": "jGgmLLQTgbc"}, {"num": -1, "titulo": "Popurrí de danzones", "duracion": 162, "videoId": "0ekFS0eBkbc"}, {"num": -1, "titulo": "Barbarito Diez - Toda una vida", "duracion": 154, "videoId": "A4bukrhDoSM"}, {"num": 1, "titulo": "La sitiera", "duracion": 175, "videoId": "uJQ1m3oIZLY"}, {"num": 5, "titulo": "Capullito de aleli", "duracion": 188, "videoId": "1FpiuEvwJcA"}, {"num": 8, "titulo": "Caballo viejo", "duracion": 284, "videoId": "adS_za_wGn4"}, {"num": 8, "titulo": "Si LLego a Besarte", "duracion": 153, "videoId": "rn3EfCbbBV0"}, {"num": 9, "titulo": "Esas no son cubanas", "duracion": 150, "videoId": "IobjegWFgVk"}, {"num": 15, "titulo": "Caballero de Paris", "duracion": 157, "videoId": "1I7wUf7rq4Y"}, {"num": 20, "titulo": "Orquesta Romeu and Barbarito Díez-Rosa Roja", "duracion": 187, "videoId": null}, {"num": 32, "titulo": "Frenesi", "duracion": 183, "videoId": "sM4_mE8JVlI"}]}, {"id": 12, "artista": "Various Artists", "album": "spain tribute or not tributes - cd 1", "año": 1990, "portada": null, "tracks": [{"num": 1, "titulo": "Mi único amigo [My only friend]", "duracion": 193, "videoId": null}, {"num": 2, "titulo": "En mi barrio [First time]", "duracion": 194, "videoId": "05rkdn2vRGI"}, {"num": 3, "titulo": "Hora cero [Zero hour]", "duracion": 154, "videoId": "gw1WJQ1MF1U"}, {"num": 4, "titulo": "will you still love me tomorr", "duracion": 108, "videoId": "WMGBcS0h-Ng"}, {"num": 5, "titulo": "Between you and me", "duracion": 139, "videoId": "xLfxsTB2qGE"}, {"num": 6, "titulo": "Bus Stop", "duracion": 176, "videoId": "n_J3IguZ8L0"}, {"num": 6, "titulo": "Sin ver el sol [Sing songs of love]", "duracion": 195, "videoId": null}, {"num": 7, "titulo": "I want what you got", "duracion": 192, "videoId": "VjZ2q1fkIxU"}, {"num": 8, "titulo": "Can´t forget that girl", "duracion": 181, "videoId": "TP3NGVATJM0"}, {"num": 9, "titulo": "Baby, it's yoy", "duracion": 166, "videoId": "wTu3SaIcZSc"}, {"num": 10, "titulo": "Back to you", "duracion": 163, "videoId": "oL2zbEXmLOE"}, {"num": 11, "titulo": "Summer fun", "duracion": 172, "videoId": "KnO_al5Tq5U"}, {"num": 12, "titulo": "Surfers are back-Teenage Kicks", "duracion": 250, "videoId": "AHrig51txC4"}, {"num": 13, "titulo": "Walking out on love", "duracion": 109, "videoId": "9ObFSUCZf9c"}, {"num": 14, "titulo": "Lo que me gusta de ti [What I like about you]", "duracion": 205, "videoId": "lRArqVGynhM"}, {"num": 15, "titulo": "Lies", "duracion": 112, "videoId": "LmwrrHgm2SM"}, {"num": 16, "titulo": "When you find out", "duracion": 187, "videoId": "wbtoPC7tYDE"}, {"num": 17, "titulo": "You know he did", "duracion": 109, "videoId": "_K-FsbLc4no"}, {"num": 18, "titulo": "Starry eyes", "duracion": 273, "videoId": "aTnLMUoGSz4"}, {"num": 19, "titulo": "In The Street", "duracion": 161, "videoId": "uj8kFK5W2nk"}, {"num": 20, "titulo": "Mrs. Rock 'n' Roll", "duracion": 117, "videoId": "W1LsRShUPtY"}, {"num": 21, "titulo": "Couldn't I  just tell you", "duracion": 145, "videoId": "xXTYEC_mbP8"}, {"num": 22, "titulo": "Rumours set the woods alight", "duracion": 168, "videoId": "z6KM186I8pQ"}, {"num": 23, "titulo": "My mind goes round in circles", "duracion": 195, "videoId": "-2AXHoY_d2o"}, {"num": 24, "titulo": "Don't push me around", "duracion": 131, "videoId": "DUhMbBEFBJo"}, {"num": 25, "titulo": "All over the world", "duracion": 279, "videoId": "bGB7Cezg5kc"}, {"num": 26, "titulo": "You shook me all night long", "duracion": 147, "videoId": "SP9t2Iq_zQ8"}]}, {"id": 13, "artista": "Songs: Ohia", "album": "The Magnolia Electric Co.", "año": 2003, "portada": "https://i.discogs.com/ysSOAqMvXQbcWMBsdOs9toGc0XvbicYgOZ9wbJTsnIQ/rs:fit/g:sm/q:90/h:600/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI5MTk4/NzYtMTM1NTIzNTUx/Ny03ODI4LmpwZWc.jpeg", "tracks": [{"num": 1, "titulo": "Farewell Transmission", "duracion": 442, "videoId": "gc3WRd_wQFE"}, {"num": 2, "titulo": "I've Been Riding With the Ghost", "duracion": 201, "videoId": "1zI2ztkoeh0"}, {"num": 3, "titulo": "Just Be Simple", "duracion": 261, "videoId": "MaKl_kn-9KY"}, {"num": 4, "titulo": "Almost Was Good Enough", "duracion": 268, "videoId": "_XJkpkx20bk"}, {"num": 5, "titulo": "The Old Black Hen", "duracion": 348, "videoId": "PXuNV_Kg9nQ"}, {"num": 6, "titulo": "Peoria Lunch Box Blues", "duracion": 347, "videoId": "EzZAePWi5Sc"}, {"num": 7, "titulo": "John Henry Split My Heart", "duracion": 370, "videoId": "v88iNycKKMI"}, {"num": 8, "titulo": "Hold On Magnolia", "duracion": 471, "videoId": "PeBMmjgPLDQ"}]}, {"id": 14, "artista": "Bomba Estéreo", "album": "Estalla", "año": 2008, "portada": "https://i.discogs.com/qmvnFdqiPMx9GaKqZ4PjS70SE58ieAFupl84d9FbikI/rs:fit/g:sm/q:90/h:533/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTExNDIy/NDEwLTE1MTYwNDk0/MDQtNzUyMy5wbmc.jpeg", "tracks": [{"num": 1, "titulo": "Cosita rica", "duracion": 276, "videoId": "A-dyYcd7-yA"}, {"num": 3, "titulo": "La boquilla", "duracion": 236, "videoId": "tij78hdPQfE"}, {"num": 4, "titulo": "Juana", "duracion": 208, "videoId": "RvN4k0PMbE0"}, {"num": 5, "titulo": "Camino evitar", "duracion": 132, "videoId": "HDaydsVmKjg"}, {"num": 6, "titulo": "Agua salá", "duracion": 247, "videoId": "JvVhPgtRJGM"}, {"num": 7, "titulo": "Feelin'", "duracion": 240, "videoId": "BQcjClqI-uo"}, {"num": 8, "titulo": "La niña rica", "duracion": 210, "videoId": "jTdLz43s72Q"}, {"num": 9, "titulo": "Música acción", "duracion": 258, "videoId": "DJ0cXmoZ4Xk"}, {"num": 11, "titulo": "Pa'ti", "duracion": 220, "videoId": "tuTzVDZzWPw"}, {"num": 12, "titulo": "Raza", "duracion": 236, "videoId": "P7gcUlDxzSc"}]}, {"id": 15, "artista": "The Byrds", "album": "Mr. Tambourine Man", "año": 1965, "portada": "https://i.discogs.com/BFuz67Ww8DqivjXe--xJVfwNcM7r-hA9HLCeIovnCCY/rs:fit/g:sm/q:90/h:500/w:500/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTI1Njgw/NDMtMTI5MDg3MTM2/OC5qcGVn.jpeg", "tracks": [{"num": 1, "titulo": "Mr. Tambourine Man", "duracion": 154, "videoId": "Swqw5a8I4b4"}, {"num": 2, "titulo": "I’ll Feel a Whole Lot Better", "duracion": 156, "videoId": "to-RVV_3anw"}, {"num": 3, "titulo": "Spanish Harlem Incident", "duracion": 121, "videoId": "3G3s1vpiSx0"}, {"num": 4, "titulo": "You Won’t Have to Cry", "duracion": 132, "videoId": "Xrfd3-NxqUM"}, {"num": 5, "titulo": "Here Without You", "duracion": 160, "videoId": "tLHMEf6Ab7o"}, {"num": 6, "titulo": "The Bells of Rhymney", "duracion": 215, "videoId": "MOHYq2KNlHY"}, {"num": 7, "titulo": "All I Really Want to Do", "duracion": 128, "videoId": "TZ5rc1yS6FE"}, {"num": 8, "titulo": "I Knew I’d Want You", "duracion": 138, "videoId": "1-r8XFTeTF4"}, {"num": 9, "titulo": "It’s No Use", "duracion": 148, "videoId": "rfBrSToKWU8"}, {"num": 10, "titulo": "Don’t Doubt Yourself, Babe", "duracion": 179, "videoId": "LLtP4qPMuDw"}, {"num": 11, "titulo": "Chimes of Freedom", "duracion": 235, "videoId": "v99HbgVHD5Y"}, {"num": 12, "titulo": "We’ll Meet Again", "duracion": 138, "videoId": "Buqs3hLrr0o"}, {"num": 13, "titulo": "She Has a Way", "duracion": 149, "videoId": "aubxUQTK6IY"}, {"num": 14, "titulo": "I’ll Feel a Whole Lot Better (alternate version)", "duracion": 152, "videoId": "to-RVV_3anw"}, {"num": 15, "titulo": "It’s No Use (alternate version)", "duracion": 148, "videoId": "rfBrSToKWU8"}, {"num": 16, "titulo": "You Won’t Have to Cry (alternate version)", "duracion": 132, "videoId": "Xrfd3-NxqUM"}, {"num": 17, "titulo": "All I Really Want to Do (single version)", "duracion": 127, "videoId": "TZ5rc1yS6FE"}, {"num": 18, "titulo": "You and Me (instrumental)", "duracion": 132, "videoId": "XAwkrYgPdOg"}]}, {"id": 16, "artista": "Mártires del Compás", "album": "[Unknown Album]", "año": null, "portada": null, "tracks": [{"num": -1, "titulo": "martires del compas& Ojos de brujo - Sevillanas del moviladi", "duracion": 182, "videoId": null}]}, {"id": 17, "artista": "Ampersan", "album": "Tonati", "año": 2020, "portada": null, "tracks": [{"num": 1, "titulo": "Tonati", "duracion": 226, "videoId": "-VmZ_IFsh3E"}]}, {"id": 18, "artista": "Amon Düül II", "album": "Carnival in Babylon", "año": 1972, "portada": "https://i.discogs.com/IkbsnjKLS6RodXqSGDJca4ZXovlwS_g91en6M-wBYgA/rs:fit/g:sm/q:90/h:600/w:597/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTkwNjEw/MzUtMTQ3NDA5MTE0/MC00NDQxLmpwZWc.jpeg", "tracks": [{"num": 1, "titulo": "C.I.D. in Uruk", "duracion": 336, "videoId": "3qMrx8AnFmw"}, {"num": 2, "titulo": "All the Years 'Round", "duracion": 444, "videoId": "3FGt9PgtkrE"}, {"num": 3, "titulo": "Shimmering Sand", "duracion": 397, "videoId": "qDUst_uFFyc"}, {"num": 4, "titulo": "Kronwinkl 12", "duracion": 235, "videoId": "MIIwcyw_qFA"}, {"num": 5, "titulo": "Tables Are Turned", "duracion": 217, "videoId": "FgGqAQ-e5x0"}, {"num": 6, "titulo": "Hawknose Harlequin", "duracion": 590, "videoId": "jcYnYcNIlIE"}, {"num": 7, "titulo": "Light", "duracion": 230, "videoId": "lB0irZaGDX8"}, {"num": 8, "titulo": "Between the Eyes", "duracion": 149, "videoId": "q3qY8ysmG1o"}, {"num": 9, "titulo": "All the Years 'Round (single version)", "duracion": 251, "videoId": "2iW_MVfXc40"}]}, {"id": 19, "artista": "Buffalo Springfield", "album": "Buffalo Springfield", "año": 1966, "portada": "https://i.discogs.com/4NSoUHel_SpioISuat033mEHvdKDiLYxpKH7c11Pf5Q/rs:fit/g:sm/q:90/h:600/w:592/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE1MDgx/MTkzLTE1OTgxNjUz/MzEtNzIzNC5qcGVn.jpeg", "tracks": [{"num": 1, "titulo": "For What It’s Worth", "duracion": 155, "videoId": "80_39eAx3z8"}, {"num": 2, "titulo": "Go and Say Goodbye", "duracion": 141, "videoId": "HauLrSM9pSw"}, {"num": 3, "titulo": "Sit Down I Think I Love You", "duracion": 152, "videoId": "bLvKvEeyNtA"}, {"num": 4, "titulo": "Nowadays Clancy Can’t Even Sing", "duracion": 206, "videoId": "0u6xJ8GGseQ"}, {"num": 5, "titulo": "Hot Dusty Roads", "duracion": 169, "videoId": "tX8E7W379sw"}, {"num": 6, "titulo": "Everybody’s Wrong", "duracion": 146, "videoId": "lNOpTSPTN3s"}, {"num": 7, "titulo": "Flying on the Ground Is Wrong", "duracion": 161, "videoId": "N_ZvAEfve38"}, {"num": 8, "titulo": "Burned", "duracion": 136, "videoId": "qjcEhrpfRnM"}, {"num": 9, "titulo": "Do I Have to Come Right Out and Say It", "duracion": 184, "videoId": "NUn_bdz1TLI"}, {"num": 10, "titulo": "Leave", "duracion": 164, "videoId": "h7HlKWDnWnA"}, {"num": 11, "titulo": "Out of My Mind", "duracion": 187, "videoId": "4bSRa8v9fPU"}, {"num": 12, "titulo": "Pay the Price", "duracion": 156, "videoId": "oHinq8ba604"}]}, {"id": 20, "artista": "Gerardo Núñez", "album": "Calima", "año": 1998, "portada": null, "tracks": [{"num": 1, "titulo": "Calima", "duracion": 473, "videoId": "5ENV5sRcN6A"}, {"num": 2, "titulo": "Sevilla (Sevillanas)", "duracion": 224, "videoId": "KX7n4uqLyGc"}, {"num": 3, "titulo": "Plazuela", "duracion": 440, "videoId": "VM6Q5ErykhU"}, {"num": 4, "titulo": "Sahara", "duracion": 273, "videoId": null}, {"num": 5, "titulo": "Bajamar (Granaína)", "duracion": 263, "videoId": "-LGMEFijmBg"}, {"num": 6, "titulo": "Tarifa (Bulería)", "duracion": 258, "videoId": null}, {"num": 7, "titulo": "Salmedina (Granaína)", "duracion": 318, "videoId": "gE1isVq-NPY"}, {"num": 8, "titulo": "Tabaco y Oro (Pasodoble)", "duracion": 234, "videoId": "CpPxl5KI9bA"}, {"num": 9, "titulo": "Sancti Petri (Rumba)", "duracion": 258, "videoId": "-nRCyX1JZVs"}, {"num": 10, "titulo": "Plaza de Arenal (Soleá por bulerías)", "duracion": 252, "videoId": "xMoXNKhRyfg"}]}, {"id": 21, "artista": "Guillermo", "album": "Voces Ceibes - Noticias da nova canción galega (1967-1974) -  (CD1)", "año": null, "portada": null, "tracks": [{"num": 1, "titulo": "Quen tivera 20 anos", "duracion": 121, "videoId": "yD8ajr6QmxU"}, {"num": 2, "titulo": "A velliña", "duracion": 214, "videoId": "Ov80Hf54XDM"}, {"num": 3, "titulo": "O vento da inxusticia", "duracion": 166, "videoId": "FNYDrJ57Dzo"}, {"num": 4, "titulo": "A vos irmáns", "duracion": 115, "videoId": "SMBXVd-t3To"}]}, {"id": 22, "artista": "Realtors", "album": "Guilt By Association", "año": 2003, "portada": "https://i.discogs.com/Yyox2EBOLvxjDA1YKbP4aGcPKLo2T-MyQdPOSrxxmQw/rs:fit/g:sm/q:90/h:600/w:589/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTEzNTU4/NDEwLTE1NTY0NzY2/MzUtOTk3NC5qcGVn.jpeg", "tracks": [{"num": 1, "titulo": "Guilt By Association", "duracion": 157, "videoId": "O4bkFO4cBL4"}, {"num": 2, "titulo": "This Is Not Acceptable", "duracion": 176, "videoId": null}, {"num": 3, "titulo": "Factory Limits", "duracion": 168, "videoId": "gne9jY-EDm4"}, {"num": 4, "titulo": "Sell Out", "duracion": 235, "videoId": "vNr4z9wCsJo"}, {"num": 5, "titulo": "ARL-7", "duracion": 58, "videoId": null}, {"num": 6, "titulo": "Where Is Bed", "duracion": 180, "videoId": "fWZTuIvpyEE"}, {"num": 7, "titulo": "Trailer Hitch", "duracion": 141, "videoId": "xXwuIPp2eDc"}, {"num": 8, "titulo": "X-Cat X-Man", "duracion": 213, "videoId": "LcvsdH4HRs0"}, {"num": 9, "titulo": "I Don't Know", "duracion": 149, "videoId": "RgWAkrXQRe4"}, {"num": 10, "titulo": "Color Film", "duracion": 138, "videoId": "qiFjX1J3k88"}, {"num": 11, "titulo": "Out To Lunch (Live)", "duracion": 166, "videoId": "leqTz46AA-A"}, {"num": 12, "titulo": "Shock Society (Live)", "duracion": 115, "videoId": "nPlHqalxVlQ"}, {"num": 13, "titulo": "X-Cat X-Man", "duracion": 231, "videoId": "LcvsdH4HRs0"}]}, {"id": 23, "artista": "The Doors", "album": "Highschool Confidential", "año": 1994, "portada": "https://i.discogs.com/1lxHLZpsbuS6hFfvzSi3hXRGz3yBE3kmc8iH5tgCM34/rs:fit/g:sm/q:90/h:600/w:597/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTQwNjAz/MzktMTQ4MDc2ODQy/MS01MzE3LmpwZWc.jpeg", "tracks": [{"num": 1, "titulo": "Moonlight Drive", "duracion": 65, "videoId": "iNilmUzcB0s"}, {"num": 2, "titulo": "Moonlight drive (incl. Horse latitudes)", "duracion": 418, "videoId": "_vy3lAMz2O8"}, {"num": 3, "titulo": "Money", "duracion": 230, "videoId": "8BsGbsvwEYM"}, {"num": 4, "titulo": "Break On Through", "duracion": 366, "videoId": "NFeUko-lQHg"}, {"num": 5, "titulo": "Backdoor Man", "duracion": 334, "videoId": "WTwNzhLvRGs"}, {"num": 6, "titulo": "People Are Strange", "duracion": 178, "videoId": "-NyC6mrutj0"}, {"num": 7, "titulo": "The Crystal Ship", "duracion": 214, "videoId": "rbulIrN4scs"}, {"num": 8, "titulo": "Wake Up", "duracion": 113, "videoId": "as18PNt9-oo"}, {"num": 9, "titulo": "Light My Fire", "duracion": 600, "videoId": "qoX6AKuYWL8"}, {"num": 10, "titulo": "The End", "duracion": 1256, "videoId": "9pRGoSbYHQE"}]}, {"id": 24, "artista": "Almodóvar & McNamara", "album": "Cómo está el servicio...de señoras", "año": null, "portada": null, "tracks": [{"num": 1, "titulo": "01 - almodovar y mcnamara - Gran Ganga", "duracion": 167, "videoId": null}, {"num": 2, "titulo": "Suck It To Me", "duracion": 270, "videoId": "pm-Blu9Y51I"}, {"num": 4, "titulo": "Susan Get Down", "duracion": 233, "videoId": "iSsf9QNFnjQ"}, {"num": 5, "titulo": "05 - almodovar y mcnamara - Satanasa", "duracion": 235, "videoId": null}, {"num": 6, "titulo": "moquito a moco", "duracion": 154, "videoId": "pptjA09sR6s"}, {"num": 6, "titulo": "Rock de la farmacia", "duracion": 207, "videoId": "IThafPZdlAM"}, {"num": 8, "titulo": "me voy a usera", "duracion": 176, "videoId": "UBLPA6NIOZQ"}, {"num": 10, "titulo": "10.Monja,jamón", "duracion": 154, "videoId": "jKXuqCI1q8A"}, {"num": 11, "titulo": "Safari", "duracion": 226, "videoId": "NlEwlFox0eU"}, {"num": 12, "titulo": "Susan get down (remix)", "duracion": 295, "videoId": "FVlbhPZRzHw"}, {"num": 14, "titulo": "Almodovar & McNamara - Voy a S", "duracion": 152, "videoId": null}]}, {"id": 25, "artista": "Sui Generis", "album": "Colegio Lasalle 1973", "año": null, "portada": null, "tracks": [{"num": 1, "titulo": "Sui Generis - Natalio Ruiz Colegio Lasalle 1973", "duracion": 303, "videoId": null}, {"num": 2, "titulo": "Sui Generis - Aprendizaje Colegio Lasalle 1973", "duracion": 241, "videoId": null}, {"num": 3, "titulo": "Mr. Jones o pequeña semblanza de una familia tipo americana", "duracion": 131, "videoId": "NxFQuLFFoMo"}, {"num": 4, "titulo": "Sui Generis - Mariel Y El Capitan Colegio Lasalle 1973", "duracion": 163, "videoId": null}, {"num": 5, "titulo": "Sui Generis - Cuando Ya Me Empiece A Quedar Solo Colegio Lasalle 1973", "duracion": 209, "videoId": "jw0eSEx6R6c"}, {"num": 6, "titulo": "Sui Generis - Confesiones De Invierno Colegio Lasalle 1973", "duracion": 256, "videoId": null}, {"num": 7, "titulo": "Sui Generis - Un Hada, Un Cisne Colegio Lasalle 1973", "duracion": 369, "videoId": null}, {"num": 8, "titulo": "Sui Generis - Cuando Te Vayas Colegio Lasalle 1973", "duracion": 163, "videoId": null}, {"num": 9, "titulo": "Sui Generis - Cancion Para Mi Muerte Colegio Lasalle 1973", "duracion": 216, "videoId": null}]}];
+
+/* ============ CONFIG (edítalo si algo difiere) ============ */
+const CONFIG = {
+  DISCOGS_USER: 'kinoluiggi',   // usuario de Discogs (dueño de la colección)
+  DISCOGS_TOKEN: 'mpkVHVRdThOWTdPRKuBCCqlFQQTBofjPolbwTljO',
+  LASTFM_USER: 'kinoluiggi',
+  LASTFM_KEY: '6b8d7a206bd7449cedb73dc6182d028e',
+  // URL de tu Cloudflare Worker de scrobbling (vacío = scrobbling apagado)
+  SCROBBLE_WORKER: '',
+  // repo de GitHub para el modo curador (?editar en la URL)
+  GITHUB_REPO: 'kinoluiggi/discoteca'
+};
+
+let INDICE = [], MODO_REMOTO = false, BASE = '', PAISES_ARTISTA = null;
+let ELIMINADOS = new Set();
+const $ = id => document.getElementById(id);
+
+async function cargarIndice(){
+  // buscar el índice en discoteca/ o en la raíz del sitio
+  for(const base of ['discoteca/', '']){
+    try{
+      const r = await fetch(base + 'indice.json');
+      if(!r.ok) continue;
+      const idx = await r.json();
+      MODO_REMOTO = true;
+      BASE = base;
+      INDICE = idx.map(e => ({id:e.id, artista:e.a, album:e.t, año:e.y,
+                              portada:e.p, n:e.n, v:e.v, ruta:e.r,
+                              generos:e.g||[], pais:e.c||null}));
+      break;
+    }catch(_){ /* probar siguiente ubicación */ }
+  }
+  if(!MODO_REMOTO){
+    INDICE = DATOS_EMBEBIDOS.map(a => ({id:a.id, artista:a.artista,
+      album:a.album, año:a.año, portada:a.portada,
+      n:a.tracks.length, v:a.tracks.filter(t=>t.videoId).length,
+      generos:a.generos||[], pais:a.pais||null}));
+  }
+  // mapa opcional de país REAL del artista (MusicBrainz)
+  try{
+    const r = await fetch(BASE + 'paises_artistas.json');
+    if(r.ok) PAISES_ARTISTA = await r.json();
+  }catch(_){ /* sin mapa: se usa país de edición */ }
+  // lista de bajas del curador
+  try{
+    const r = await fetch(BASE + 'eliminados.json?t=' + Date.now());
+    if(r.ok) ELIMINADOS = new Set(await r.json());
+  }catch(_){ /* sin bajas */ }
+  if(ELIMINADOS.size) INDICE = INDICE.filter(e => !ELIMINADOS.has(e.id));
+  $('sub-header').textContent =
+    `${INDICE.length} ÁLBUMES` + (MODO_REMOTO ? '' : ' · DEMO');
+}
+
+// país efectivo de una entrada: del artista si hay mapa, si no de la edición
+function paisDe(e){
+  if(PAISES_ARTISTA){
+    return PAISES_ARTISTA[normalizar(e.artista||'')] || null;
+  }
+  return e.pais;
+}
+async function cargarAlbum(entrada){
+  if(MODO_REMOTO){
+    // en modo curador, saltarse el caché para ver la versión recién guardada
+    const extra = (typeof MODO_EDITAR !== 'undefined' && MODO_EDITAR)
+      ? '?t=' + Date.now() : '';
+    const r = await fetch(BASE + entrada.ruta + extra);
+    return await r.json();
+  }
+  return DATOS_EMBEBIDOS.find(a => a.id === entrada.id);
+}
+
+/* ====================== GRID ====================== */
+let filtroTexto = '', filtroDecada = null, filtroGenero = '', filtroPais = '';
+const decadaDe = y => y ? Math.floor(y/10)*10 : null;
+const normalizar = s => (s||'').toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+function pintarChips(){
+  const decs = [...new Set(INDICE.map(e=>decadaDe(e.año)).filter(Boolean))]
+    .sort((a,b)=>a-b);
+  const cont = $('chips-decadas');
+  cont.innerHTML = '';
+  const todos = document.createElement('button');
+  todos.className='chip activo'; todos.textContent='TODAS';
+  todos.onclick = ()=>{ filtroDecada=null; refrescarChips(); pintarGrid(); };
+  cont.appendChild(todos);
+  decs.forEach(d=>{
+    const c = document.createElement('button');
+    c.className='chip'; c.dataset.dec=d; c.textContent=d+'s';
+    c.onclick = ()=>{ filtroDecada = (filtroDecada===d?null:d);
+                      refrescarChips(); pintarGrid(); };
+    cont.appendChild(c);
+  });
+}
+function refrescarChips(){
+  document.querySelectorAll('.chip').forEach(c=>{
+    const d = c.dataset.dec ? parseInt(c.dataset.dec) : null;
+    c.classList.toggle('activo', d===filtroDecada);
+  });
+}
+function pintarSelectores(){
+  const cuentaG = {}, cuentaP = {};
+  INDICE.forEach(e=>{
+    (e.generos||[]).forEach(g=> cuentaG[g]=(cuentaG[g]||0)+1);
+    const p = paisDe(e);
+    if(p) cuentaP[p]=(cuentaP[p]||0)+1;
+  });
+  const selG = $('sel-genero'), selP = $('sel-pais');
+  selP.options[0].textContent = PAISES_ARTISTA
+    ? 'PAÍS ARTISTA: TODOS' : 'PAÍS (EDICIÓN): TODOS';
+  const gs = Object.keys(cuentaG).sort((a,b)=>cuentaG[b]-cuentaG[a]);
+  const ps = Object.keys(cuentaP).sort((a,b)=>cuentaP[b]-cuentaP[a]);
+  if(gs.length){
+    gs.forEach(g=>{
+      const o=document.createElement('option');
+      o.value=g; o.textContent=`${g} (${cuentaG[g]})`;
+      selG.appendChild(o);
+    });
+    selG.style.display='';
+    selG.onchange = ()=>{ filtroGenero=selG.value; pintarGrid(); };
+  }
+  if(ps.length){
+    ps.forEach(p=>{
+      const o=document.createElement('option');
+      o.value=p; o.textContent=`${p} (${cuentaP[p]})`;
+      selP.appendChild(o);
+    });
+    selP.style.display='';
+    selP.onchange = ()=>{ filtroPais=selP.value; pintarGrid(); };
+  }
+}
+function visiblesAhora(){
+  const q = normalizar(filtroTexto);
+  return INDICE.filter(e=>{
+    if(filtroDecada && decadaDe(e.año)!==filtroDecada) return false;
+    if(filtroGenero && !(e.generos||[]).includes(filtroGenero)) return false;
+    if(filtroPais && paisDe(e) !== filtroPais) return false;
+    if(q && !normalizar(e.artista+' '+e.album).includes(q)) return false;
+    return true;
+  });
+}
+function pintarGrid(){
+  const visibles = visiblesAhora();
+  $('contador').textContent = `${visibles.length} ÁLBUMES`;
+  const grid = $('grid');
+  grid.innerHTML = '';
+  visibles.forEach(e=>{
+    const div = document.createElement('div');
+    div.className = 'tarjeta' + (e.v===0 ? ' sin-video' : '');
+    const cara = e.portada
+      ? `<img src="${e.portada}" loading="lazy" alt="">`
+      : `<div class="cara-tipo"><b>${e.album||'—'}</b><i>${e.artista||''}</i></div>`;
+    div.innerHTML = `<div class="cara">${cara}</div>
+      <div class="datos"><b>${e.album||'—'}</b>
+      <span>${e.artista||''}${e.año?' · '+e.año:''}</span></div>`;
+    div.onclick = ()=> abrirAlbum(e);
+    grid.appendChild(div);
+  });
+}
+$('buscador').addEventListener('input', ev=>{
+  filtroTexto = ev.target.value; pintarGrid();
+});
+$('btn-disco-azar').onclick = ()=>{
+  const candidatos = visiblesAhora().filter(e=>e.v>0);
+  if(!candidatos.length) return;
+  abrirAlbum(candidatos[Math.floor(Math.random()*candidatos.length)], true);
+};
+
+/* ====================== YOUTUBE ====================== */
+let yt=null, ytListo=false;
+window.onYouTubeIframeAPIReady = function(){
+  yt = new YT.Player('yt-player', {
+    width:'100%', height:'100%', videoId:'',
+    playerVars:{playsinline:1, rel:0},
+    events:{
+      onReady: ()=>{ ytListo=true; yt.setVolume(parseInt($('vol').value)); },
+      onStateChange: ev=>{
+        if(ev.data===YT.PlayerState.ENDED){
+          if(RADIO) radioSiguiente(); else siguiente();
+        }
+        if(ev.data===YT.PlayerState.PLAYING) sincronizar(true);
+        if(ev.data===YT.PlayerState.PAUSED) sincronizar(false);
+      },
+      onError: ()=>{ marcarRota(); if(RADIO) radioSiguiente(); else siguiente(); }
+    }
+  });
+};
+(function(){
+  const tag=document.createElement('script');
+  tag.src='https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+})();
+
+/* ====================== PLAYER ====================== */
+let ALBUM=null, pista=0, sonando=false, reloj=null;
+let shuffle=false, repetir=false, orden=[], posOrden=0;
+let RADIO=false, radioCandidatos=[];
+
+/* pista reproducible: tiene video de YouTube O audio directo */
+const reproducible = t => !!(t && (t.videoId || t.audio || t.soundcloud));
+const motorDe = t => t && (t.audio ? 'audio' : (t.soundcloud ? 'sc' : (t.videoId ? 'yt' : null)));
+
+/* ---------- motor SoundCloud (Widget API) ---------- */
+let scWidget=null, scListo=false, scPos=0, scDur=0, scPend=null;
+
+function asegurarSC(cb){
+  if(scListo){ cb(); return; }
+  function init(){
+    const ifr = $('sc-player');
+    if(!ifr.src && scPend){
+      ifr.src = 'https://w.soundcloud.com/player/?url=' +
+        encodeURIComponent(scPend.url) +
+        '&auto_play=' + (scPend.autoplay ? 'true' : 'false') +
+        '&visual=false&show_comments=false&hide_related=true';
+    }
+    scWidget = SC.Widget(ifr);
+    scWidget.bind(SC.Widget.Events.READY, ()=>{
+      scListo = true;
+      scWidget.setVolume(parseInt($('vol').value));
+      scWidget.getDuration(d=>{ scDur = d/1000; });
+      cb();
+    });
+    scWidget.bind(SC.Widget.Events.FINISH, ()=> RADIO ? radioSiguiente() : siguiente());
+    scWidget.bind(SC.Widget.Events.PLAY, ()=> sincronizar(true));
+    scWidget.bind(SC.Widget.Events.PAUSE, ()=> sincronizar(false));
+    scWidget.bind(SC.Widget.Events.PLAY_PROGRESS, e=>{ scPos = e.currentPosition/1000; });
+    scWidget.bind(SC.Widget.Events.ERROR, ()=>{ marcarRota(); RADIO ? radioSiguiente() : siguiente(); });
+  }
+  if(window.SC && SC.Widget){ init(); }
+  else{
+    const tag = document.createElement('script');
+    tag.src = 'https://w.soundcloud.com/player/api.js';
+    tag.onload = init;
+    document.head.appendChild(tag);
+  }
+}
+function cargarSC(url, autoplay){
+  scPend = {url, autoplay};
+  scPos = 0; scDur = 0;
+  asegurarSC(()=>{
+    scWidget.load(url, {auto_play: autoplay, visual:false,
+      callback: ()=>{ scWidget.getDuration(d=>{ scDur = d/1000; }); }});
+  });
+}
+function mostrarMotor(m){
+  const ytEl = $('yt-player'), scEl = $('sc-player');
+  if(ytEl) ytEl.style.display = (m==='sc') ? 'none' : '';
+  if(scEl) scEl.style.display = (m==='sc') ? '' : 'none';
+}
+
+/* ---------- scrobbling vía Worker (regla oficial: 50% o 4 min) ---------- */
+let scrob = {nowplaying:false, enviado:false, inicio:0};
+
+function scrobblear(payload){
+  if(!CONFIG.SCROBBLE_WORKER) return;
+  fetch(CONFIG.SCROBBLE_WORKER, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  }).catch(()=>{});
+}
+function scrobNowPlaying(){
+  if(scrob.nowplaying || !ALBUM) return;
+  const t = ALBUM.tracks[pista];
+  if(!reproducible(t)) return;
+  scrob.nowplaying = true;
+  scrobblear({type:'nowplaying', artist:ALBUM.artista,
+              track:t.titulo, album:ALBUM.album});
+}
+function scrobRevisar(s, d){
+  if(scrob.enviado || !ALBUM || !CONFIG.SCROBBLE_WORKER) return;
+  if(d < 30) return;                    // Last.fm ignora pistas <30s
+  if(s >= Math.min(d/2, 240)){          // 50% de la pista o 4 minutos
+    scrob.enviado = true;
+    const t = ALBUM.tracks[pista];
+    scrobblear({type:'scrobble', artist:ALBUM.artista,
+                track:t.titulo, album:ALBUM.album,
+                timestamp: scrob.inicio});
+  }
+}
+
+function pintarAlbumUI(){
+  $('titulo-album').innerHTML =
+    (RADIO ? '<span style="color:var(--ambar)">📻 RADIO</span> · ' : '') +
+    `<b>${ALBUM.album||'—'}</b> · ${ALBUM.artista||''}`;
+
+  // portada integrada
+  if(ALBUM.portada){
+    $('portada-img').src = ALBUM.portada;
+    $('portada-img').style.display='block';
+    $('portada-tipo').style.display='none';
+  }else{
+    $('portada-img').style.display='none';
+    $('portada-tipo').style.display='flex';
+    $('pt-titulo').textContent = ALBUM.album||'—';
+    $('pt-artista').textContent = ALBUM.artista||'';
+  }
+  // botón de cambio de portada (modo curador)
+  const zonaP = document.querySelector('.portada-zona');
+  const viejo = $('btn-portada');
+  if(viejo) viejo.remove();
+  if(MODO_EDITAR && ALBUM._ruta){
+    const b = document.createElement('button');
+    b.id = 'btn-portada';
+    b.textContent = '✎ PORTADA';
+    b.style.cssText = 'position:absolute;top:10px;right:10px;z-index:5;' +
+      'background:rgba(13,15,18,.85);border:1px solid var(--ambar);' +
+      'color:var(--ambar);border-radius:6px;padding:6px 10px;' +
+      'font-size:10px;letter-spacing:.1em;cursor:pointer;font-family:inherit';
+    b.onclick = ()=> editarPortada();
+    zonaP.appendChild(b);
+  }
+  $('info-album').textContent = ALBUM.album||'—';
+  $('info-artista').textContent = ALBUM.artista||'';
+  const durTotal = ALBUM.tracks.reduce((s,t)=>s+(t.duracion||0),0);
+  $('info-meta').textContent =
+    `${ALBUM.año||''}${ALBUM.año?' · ':''}${ALBUM.tracks.length} pistas · ${fmt(durTotal)}`;
+  const et = $('info-etiquetas');
+  et.innerHTML='';
+  [...(ALBUM.generos||[]), ...(ALBUM.estilos||[]).slice(0,3),
+   ...(ALBUM.pais?[ALBUM.pais]:[])].forEach(g=>{
+    const s=document.createElement('span');
+    s.className='etiqueta-mini'; s.textContent=g;
+    et.appendChild(s);
+  });
+  const be = $('btn-eliminar');
+  if(be) be.style.display = (MODO_EDITAR && ALBUM._ruta) ? '' : 'none';
+  // herramientas de orden en la cabecera de la playlist (modo curador)
+  const cabPl = document.querySelector('.playlist-cab');
+  const viejoHerr = $('herr-orden');
+  if(viejoHerr) viejoHerr.remove();
+  if(MODO_EDITAR && ALBUM._ruta && !RADIO){
+    const cont = document.createElement('span');
+    cont.id = 'herr-orden';
+    cont.style.cssText = 'margin-left:auto;display:flex;gap:8px';
+    const b1 = document.createElement('button');
+    b1.textContent = '⇅ POR №';
+    b1.title = 'Reordenar las pistas según su número';
+    b1.style.cssText = 'background:none;border:1px solid var(--linea);color:var(--texto-tenue);border-radius:4px;font-size:9px;letter-spacing:.08em;cursor:pointer;padding:2px 7px;font-family:inherit';
+    b1.onclick = ordenarPorNum;
+    const b2 = document.createElement('button');
+    b2.textContent = '№ RENUMERAR';
+    b2.title = 'Asignar 1,2,3... según el orden actual';
+    b2.style.cssText = b1.style.cssText;
+    b2.onclick = renumerar;
+    cont.appendChild(b1); cont.appendChild(b2);
+    cabPl.appendChild(cont);
+  }
+  // botón de edición de ficha (modo curador)
+  const viejoBF = $('btn-ficha');
+  if(viejoBF) viejoBF.remove();
+  if(MODO_EDITAR && ALBUM._ruta){
+    const bf = document.createElement('button');
+    bf.id = 'btn-ficha';
+    bf.textContent = '✎ FICHA';
+    bf.style.cssText = 'margin-top:10px;background:none;border:1px solid var(--ambar);' +
+      'color:var(--ambar);border-radius:6px;padding:5px 10px;font-size:10px;' +
+      'letter-spacing:.1em;cursor:pointer;font-family:inherit';
+    bf.onclick = editarFicha;
+    document.querySelector('.info-album').appendChild(bf);
+  }
+
+  // playlist
+  const lista=$('lista');
+  lista.innerHTML='';
+  ALBUM.tracks.forEach((t,i)=>{
+    const div=document.createElement('div');
+    div.className='pista'+(reproducible(t)?'':' muda');
+    div.innerHTML=`<span class="num">${String(t.num||i+1).padStart(2,'0')}</span>
+      <span class="titulo">${t.titulo||'—'}${reproducible(t)?'':' · (sin fuente)'}${t.audio?' · ♪':''}${t.soundcloud?' · ☁':''}</span>
+      <span class="dur">${fmt(t.duracion)}</span>`;
+    if(MODO_EDITAR && ALBUM._ruta){
+      const sube=document.createElement('button');
+      sube.textContent='▲'; sube.title='Subir pista';
+      sube.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:10px;padding:0 2px';
+      sube.onclick=ev=>{ ev.stopPropagation(); moverPista(i,-1); };
+      const baja=document.createElement('button');
+      baja.textContent='▼'; baja.title='Bajar pista';
+      baja.style.cssText=sube.style.cssText;
+      baja.onclick=ev=>{ ev.stopPropagation(); moverPista(i,1); };
+      div.appendChild(sube); div.appendChild(baja);
+      const busca=document.createElement('a');
+      busca.textContent='🔎'; busca.title='Buscar en YouTube';
+      busca.href='https://www.youtube.com/results?search_query='+
+        encodeURIComponent((ALBUM.artista||'')+' '+(t.titulo||''));
+      busca.target='_blank'; busca.style.cssText='text-decoration:none;font-size:12px';
+      busca.onclick=ev=>ev.stopPropagation();
+      const lapiz=document.createElement('button');
+      lapiz.textContent='✎'; lapiz.title='Pegar URL o ID de YouTube';
+      lapiz.style.cssText='background:none;border:none;color:var(--ambar);cursor:pointer;font-size:13px';
+      lapiz.onclick=ev=>{ ev.stopPropagation(); editarPista(i); };
+      div.appendChild(busca); div.appendChild(lapiz);
+    }
+    if(reproducible(t)) div.onclick=()=>{ irA(i); };
+    lista.appendChild(div);
+  });
+}
+
+let TAB = 'discoteca';
+const VISTAS = {discoteca:'vista-grid', vinilos:'vista-vinilos', lastfm:'vista-lastfm'};
+function irTab(t){
+  TAB = t;
+  ['vista-grid','vista-vinilos','vista-lastfm','vista-player']
+    .forEach(id=>$(id).style.display='none');
+  $(VISTAS[t]).style.display='block';
+  document.querySelectorAll('.tab').forEach(b=>
+    b.classList.toggle('activo', b.dataset.tab===t));
+  if(t==='vinilos') initVinilos();
+  if(t==='lastfm') initLastfm();
+}
+
+let scrollGuardado = 0;
+function mostrarPlayer(){
+  scrollGuardado = window.scrollY;
+  ['vista-grid','vista-vinilos','vista-lastfm']
+    .forEach(id=>$(id).style.display='none');
+  $('vista-player').style.display='block';
+  window.scrollTo(0,0);
+}
+
+async function abrirAlbum(entrada, autoplay=false){
+  const alb = await cargarAlbum(entrada);
+  if(MODO_REMOTO) alb._ruta = BASE + entrada.ruta;  // ruta en el repo
+  abrirAlbumObjeto(alb, autoplay);
+}
+
+function abrirAlbumObjeto(alb, autoplay=false){
+  RADIO = false;
+  ALBUM = alb;
+  mostrarPlayer();
+  pintarAlbumUI();
+  regenerarOrden();
+  const primera = orden.length ? orden[0] : 0;
+  posOrden = 0;
+  cargar(primera, autoplay && orden.length > 0);
+  if(!autoplay) detener();
+}
+
+let cola=[], colaPos=-1, ampliando=false;
+
+function pintarColaUI(){
+  const lista=$('lista');
+  lista.innerHTML='';
+  cola.forEach((it,i)=>{
+    const t=it.album.tracks[it.trackIdx];
+    const div=document.createElement('div');
+    div.className='pista'+(i===colaPos?' activa':'');
+    div.innerHTML=`<span class="num">${String(i+1).padStart(2,'0')}</span>
+      <span class="titulo">${t.titulo||'—'} · <span style="color:var(--texto-tenue)">${it.album.artista||''}</span></span>
+      <span class="dur">${fmt(t.duracion)}</span>`;
+    div.onclick=()=>{ colaPos=i; reproducirItem(); };
+    lista.appendChild(div);
+  });
+  const act=lista.children[colaPos];
+  if(act) act.scrollIntoView({block:'nearest'});
+}
+
+async function ampliarCola(n=15){
+  if(ampliando || !radioCandidatos.length) return;
+  ampliando=true;
+  const picks=[];
+  for(let i=0;i<n;i++)
+    picks.push(radioCandidatos[Math.floor(Math.random()*radioCandidatos.length)]);
+  const albums=await Promise.all(picks.map(p=>cargarAlbum(p).catch(()=>null)));
+  albums.forEach(al=>{
+    if(!al) return;
+    const conFuente=al.tracks.map((t,i)=>reproducible(t)?i:-1).filter(i=>i>=0);
+    if(!conFuente.length) return;
+    cola.push({album:al,
+               trackIdx:conFuente[Math.floor(Math.random()*conFuente.length)]});
+  });
+  ampliando=false;
+  if(RADIO) pintarColaUI();
+}
+
+function reproducirItem(){
+  const it=cola[colaPos];
+  if(!it){ detener(); return; }
+  ALBUM=it.album;
+  pintarAlbumUI();   // portada e info del disco de la canción actual
+  pintarColaUI();    // la cola sustituye al tracklist del disco
+  regenerarOrden();
+  posOrden=Math.max(0, orden.indexOf(it.trackIdx));
+  cargar(it.trackIdx, true);
+  if(colaPos >= cola.length-4) ampliarCola();  // extender antes de agotarse
+}
+
+async function radioSiguiente(){
+  if(colaPos+1 >= cola.length) await ampliarCola();
+  if(colaPos+1 >= cola.length){ detener(); return; }
+  colaPos++;
+  reproducirItem();
+}
+function radioAnterior(){
+  if(colaPos <= 0) return;
+  colaPos--;
+  reproducirItem();
+}
+$('btn-volver').onclick = ()=>{
+  RADIO = false;
+  stopTodo();
+  $('vista-player').style.display='none';
+  irTab(TAB);
+  window.scrollTo(0, scrollGuardado);
+};
+
+function fmt(s){
+  if(!s && s!==0) return '';
+  s=Math.floor(s);
+  const h=Math.floor(s/3600);
+  const m=Math.floor((s%3600)/60);
+  const ss=String(s%60).padStart(2,'0');
+  return h ? `${h}:${String(m).padStart(2,'0')}:${ss}` : `${m}:${ss}`;
+}
+
+function regenerarOrden(){
+  orden = ALBUM.tracks.map((t,i)=>reproducible(t)?i:-1).filter(i=>i>=0);
+  if(shuffle){
+    for(let i=orden.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [orden[i],orden[j]]=[orden[j],orden[i]];
+    }
+  }
+}
+
+function cargar(i, reproducir=false){
+  pista=i;
+  scrob = {nowplaying:false, enviado:false,
+           inicio: Math.floor(Date.now()/1000)};
+  const t=ALBUM.tracks[i];
+  if(!RADIO){
+    document.querySelectorAll('.pista').forEach((el,j)=>
+      el.classList.toggle('activa', j===i));
+  }
+  $('t-actual').textContent='0:00';
+  $('t-total').textContent=fmt(t.duracion);
+  ponerSeek(0, t.duracion||1);
+  const au = $('motor-audio');
+  const motor = motorDe(t);
+  if(motor !== 'audio'){ au.pause(); au.removeAttribute('src'); }
+  if(motor !== 'yt' && ytListo && yt.stopVideo) yt.stopVideo();
+  if(motor !== 'sc' && scListo && scWidget) scWidget.pause();
+  mostrarMotor(motor);
+  if(motor === 'audio'){
+    au.src = t.audio;
+    if(reproducir) au.play().catch(()=>{});
+  } else if(motor === 'sc'){
+    cargarSC(t.soundcloud, reproducir);
+  } else if(motor === 'yt' && ytListo){
+    // loadVideoById carga Y reproduce en un solo paso: conserva el
+    // permiso del clic del usuario
+    if(reproducir) yt.loadVideoById(t.videoId);
+    else yt.cueVideoById(t.videoId);
+  }
+  if(reproducir) sincronizar(true);
+}
+function irA(i){
+  posOrden = Math.max(0, orden.indexOf(i));
+  cargar(i, true);
+}
+function play(){
+  const t=ALBUM.tracks[pista];
+  if(!reproducible(t)){ siguiente(); return; }
+  if(t.audio){
+    $('motor-audio').play().catch(()=>{});
+    sincronizar(true);
+    return;
+  }
+  if(t.soundcloud){
+    if(scListo && scWidget) scWidget.play();
+    else cargarSC(t.soundcloud, true);
+    sincronizar(true);
+    return;
+  }
+  if(ytListo){
+    const st = yt.getPlayerState ? yt.getPlayerState() : -1;
+    if(st === 5 || st === -1) yt.loadVideoById(t.videoId);
+    else yt.playVideo();
+  }
+  sincronizar(true);
+}
+function pausa(){
+  const t=ALBUM && ALBUM.tracks[pista];
+  if(t && t.audio) $('motor-audio').pause();
+  else if(t && t.soundcloud){ if(scListo && scWidget) scWidget.pause(); }
+  else if(ytListo) yt.pauseVideo();
+  sincronizar(false);
+}
+function stopTodo(){
+  const au=$('motor-audio');
+  au.pause(); au.removeAttribute('src');
+  if(scListo && scWidget) scWidget.pause();
+  if(ytListo && yt.stopVideo) yt.stopVideo();
+  detener();
+}
+function sincronizar(playing){
+  sonando=playing;
+  if(playing) scrobNowPlaying();
+  $('mini-cd').classList.toggle('girando', playing);
+  $('btn-play').textContent = playing ? '⏸' : '▶';
+  clearInterval(reloj);
+  if(playing) reloj=setInterval(tic, 400);
+  animarAnalizador(playing);
+}
+function detener(){
+  sonando=false;
+  $('mini-cd').classList.remove('girando');
+  $('btn-play').textContent='▶';
+  clearInterval(reloj);
+  $('t-actual').textContent='0:00';
+  ponerSeek(0,1);
+  animarAnalizador(false);
+}
+function tic(){
+  if(arrastrando) return;
+  const t = ALBUM.tracks[pista];
+  let s, d;
+  if(t.audio){
+    const au = $('motor-audio');
+    s = au.currentTime || 0;
+    d = au.duration || t.duracion || 1;
+  } else if(t.soundcloud){
+    if(scListo && scWidget) scWidget.getPosition(p=>{ scPos = p/1000; });
+    s = scPos;
+    d = scDur || t.duracion || 1;
+  } else {
+    if(!ytListo) return;
+    s = yt.getCurrentTime ? yt.getCurrentTime() : 0;
+    d = (yt.getDuration && yt.getDuration()) || t.duracion || 1;
+  }
+  $('t-actual').textContent = fmt(s);
+  $('t-total').textContent = fmt(d);
+  ponerSeek(s,d);
+  scrobRevisar(s, d);
+}
+function ponerSeek(s,d){
+  const v = Math.round(1000*s/Math.max(d,1));
+  const seek=$('seek');
+  seek.value=v;
+  seek.style.setProperty('--prog', (v/10)+'%');
+}
+
+function siguiente(){
+  if(!orden.length){ detener(); return; }
+  posOrden++;
+  if(posOrden >= orden.length){
+    if(repetir){ posOrden=0; if(shuffle) regenerarOrden(); }
+    else { detener(); return; }
+  }
+  cargar(orden[posOrden], true);
+}
+function anterior(){
+  if(!orden.length) return;
+  posOrden = Math.max(0, posOrden-1);
+  cargar(orden[posOrden], sonando);
+}
+function marcarRota(){
+  if(RADIO) return;  // en radio la cola sigue sola
+  const el = document.querySelectorAll('.pista')[pista];
+  if(el){ el.classList.add('muda');
+    el.querySelector('.titulo').textContent += ' · (no disponible)'; }
+}
+
+/* seek arrastrable */
+let arrastrando=false;
+$('seek').addEventListener('input', ()=>{ arrastrando=true;
+  $('seek').style.setProperty('--prog', ($('seek').value/10)+'%'); });
+$('seek').addEventListener('change', ()=>{
+  arrastrando=false;
+  const t = ALBUM && ALBUM.tracks[pista];
+  if(t && t.audio){
+    const au = $('motor-audio');
+    const d = au.duration || t.duracion || 0;
+    au.currentTime = d * $('seek').value/1000;
+    return;
+  }
+  if(t && t.soundcloud){
+    if(scListo && scWidget){
+      const d = scDur || t.duracion || 0;
+      scWidget.seekTo(d * $('seek').value/1000 * 1000);
+    }
+    return;
+  }
+  if(!ytListo) return;
+  const d = (yt.getDuration && yt.getDuration()) ||
+            ALBUM.tracks[pista].duracion || 0;
+  yt.seekTo(d * $('seek').value/1000, true);
+});
+$('vol').addEventListener('input', ()=>{
+  const v = parseInt($('vol').value);
+  if(ytListo) yt.setVolume(v);
+  if(scListo && scWidget) scWidget.setVolume(v);
+  $('motor-audio').volume = v/100;
+});
+
+/* eventos del motor de audio */
+(function(){
+  const au = $('motor-audio');
+  au.addEventListener('ended', ()=> RADIO ? radioSiguiente() : siguiente());
+  au.addEventListener('playing', ()=> sincronizar(true));
+  au.addEventListener('pause', ()=>{ if(!au.ended) sincronizar(false); });
+  au.addEventListener('error', ()=>{
+    if(au.getAttribute('src')){ marcarRota(); RADIO ? radioSiguiente() : siguiente(); }
+  });
+})();
+
+/* botones */
+$('btn-play').onclick = ()=> sonando ? pausa() : play();
+$('btn-stop').onclick = stopTodo;
+$('btn-next').onclick = ()=> RADIO ? radioSiguiente() : siguiente();
+$('btn-prev').onclick = ()=> RADIO ? radioAnterior() : anterior();
+$('btn-radio').onclick = async ()=>{
+  radioCandidatos = visiblesAhora().filter(e=>e.v>0);
+  if(!radioCandidatos.length) return;
+  RADIO = true; cola=[]; colaPos=-1;
+  mostrarPlayer();
+  await ampliarCola();
+  radioSiguiente();
+};
+$('btn-shuffle').onclick = ()=>{
+  shuffle=!shuffle;
+  $('btn-shuffle').classList.toggle('activo', shuffle);
+  const actual=pista;
+  regenerarOrden();
+  posOrden = Math.max(0, orden.indexOf(actual));
+};
+$('btn-repeat').onclick = ()=>{
+  repetir=!repetir;
+  $('btn-repeat').classList.toggle('activo', repetir);
+};
+
+/* video plegable */
+$('video-toggle').onclick = ()=>{
+  const w=$('yt-wrap');
+  w.classList.toggle('plegado');
+  $('video-flecha').textContent = w.classList.contains('plegado') ? '▸' : '▾';
+};
+
+/* analizador de espectro (guiño Amarok) */
+(function(){
+  const a=$('analizador');
+  for(let i=0;i<16;i++){ a.appendChild(document.createElement('i')); }
+})();
+let analizadorTimer=null;
+function animarAnalizador(on){
+  clearInterval(analizadorTimer);
+  const barras=document.querySelectorAll('.analizador i');
+  if(!on){ barras.forEach(b=>b.style.height='3px'); return; }
+  analizadorTimer=setInterval(()=>{
+    barras.forEach(b=>{
+      b.style.height = (3+Math.random()*22)+'px';
+    });
+  }, 130);
+}
+
+/* ---------- diálogos propios (inmunes al bloqueo de Firefox) ---------- */
+let dlgRes = null;
+function dialogo(opts){
+  return new Promise(res=>{
+    dlgRes = res;
+    $('dlg-titulo').textContent = opts.titulo || '';
+    $('dlg-msg').textContent = opts.mensaje || '';
+    $('dlg-msg').style.display = opts.mensaje ? '' : 'none';
+    const inp = $('dlg-input');
+    if(opts.valor === null || opts.valor === undefined){
+      inp.style.display = 'none';
+    }else{
+      inp.style.display = '';
+      inp.value = opts.valor;
+    }
+    $('modal-dialogo').hidden = false;
+    if(opts.valor !== null && opts.valor !== undefined){
+      setTimeout(()=>{ inp.focus(); inp.select(); }, 50);
+    }
+  });
+}
+function cerrarDialogo(ok){
+  $('modal-dialogo').hidden = true;
+  const inp = $('dlg-input');
+  const conInput = inp.style.display !== 'none';
+  const r = ok ? (conInput ? inp.value : true) : null;
+  const fn = dlgRes; dlgRes = null;
+  if(fn) fn(r);
+}
+document.addEventListener('keydown', ev=>{
+  if($('modal-dialogo').hidden) return;
+  if(ev.key === 'Enter') cerrarDialogo(true);
+  if(ev.key === 'Escape') cerrarDialogo(false);
+});
+let toastTimer = null;
+function avisar(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('ver');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('ver'), 4000);
+}
+async function pedirToken(){
+  let token = localStorage.getItem('gh_token');
+  if(token) return token;
+  const r = await dialogo({titulo: 'TOKEN DE GITHUB',
+    mensaje: 'Pega tu token (con permiso repo).\nSe guarda solo en este navegador.',
+    valor: ''});
+  if(!r || !r.trim()) return null;
+  token = r.trim();
+  localStorage.setItem('gh_token', token);
+  return token;
+}
+
+/* ====================== MODO CURADOR (?editar) ====================== */
+const MODO_EDITAR = new URLSearchParams(location.search).has('editar');
+let hayCambios = false;
+
+function editarFicha(){
+  $('ficha-artista').value = ALBUM.artista || '';
+  $('ficha-album').value = ALBUM.album || '';
+  $('ficha-anio').value = ALBUM.año || '';
+  $('ficha-generos').value = (ALBUM.generos || []).join(', ');
+  $('ficha-estilos').value = (ALBUM.estilos || []).join(', ');
+  $('ficha-pais').value = ALBUM.pais || '';
+  $('modal-ficha').hidden = false;
+  $('ficha-artista').focus();
+}
+function cerrarFicha(aplicar){
+  $('modal-ficha').hidden = true;
+  if(!aplicar) return;
+  ALBUM.artista = $('ficha-artista').value.trim() || null;
+  ALBUM.album = $('ficha-album').value.trim() || null;
+  const n = parseInt($('ficha-anio').value.trim());
+  ALBUM.año = isNaN(n) ? null : n;
+  const alista = campo => campo.split(',').map(x=>x.trim()).filter(Boolean);
+  const gs = alista($('ficha-generos').value);
+  const es = alista($('ficha-estilos').value);
+  ALBUM.generos = gs.length ? gs : null;
+  ALBUM.estilos = es.length ? es : null;
+  ALBUM.pais = $('ficha-pais').value.trim() || null;
+  hayCambios = true;
+  pintarAlbumUI();
+  const btn = $('btn-guardar');
+  if(btn) btn.style.display = '';
+}
+
+function marcarSucio(){
+  hayCambios = true;
+  const btn = $('btn-guardar');
+  if(btn) btn.style.display = '';
+}
+function moverPista(i, dir){
+  const j = i + dir;
+  if(j < 0 || j >= ALBUM.tracks.length) return;
+  [ALBUM.tracks[i], ALBUM.tracks[j]] = [ALBUM.tracks[j], ALBUM.tracks[i]];
+  if(pista === i) pista = j; else if(pista === j) pista = i;
+  regenerarOrden();
+  posOrden = Math.max(0, orden.indexOf(pista));
+  marcarSucio();
+  pintarAlbumUI();
+}
+function renumerar(){
+  ALBUM.tracks.forEach((t, k)=>{ t.num = k + 1; });
+  marcarSucio();
+  pintarAlbumUI();
+}
+function ordenarPorNum(){
+  const actual = ALBUM.tracks[pista];
+  ALBUM.tracks.sort((a, b)=>(a.num || 999) - (b.num || 999));
+  pista = Math.max(0, ALBUM.tracks.indexOf(actual));
+  regenerarOrden();
+  posOrden = Math.max(0, orden.indexOf(pista));
+  marcarSucio();
+  pintarAlbumUI();
+}
+
+async function editarPortada(){
+  const resp = await dialogo({
+    titulo: '✎ PORTADA',
+    mensaje: `${ALBUM.artista} — ${ALBUM.album}\n` +
+      `Pega la URL de la imagen. Vacío = quitar portada.`,
+    valor: ALBUM.portada || ''});
+  if(resp === null) return;
+  // limpiar espacios y saltos de línea que se cuelan al copiar URLs largas
+  ALBUM.portada = resp.replace(/\s+/g, '') || null;
+  hayCambios = true;
+  pintarAlbumUI();
+  const btn = $('btn-guardar');
+  if(btn) btn.style.display = '';
+}
+
+async function editarPista(i){
+  const t = ALBUM.tracks[i];
+  const actual = t.videoId || '';
+  const resp = await dialogo({
+    titulo: '✎ FUENTE DE LA PISTA',
+    mensaje: `${ALBUM.artista} — ${t.titulo}\n` +
+      `URL/ID de YouTube, URL de SoundCloud, o audio directo (.mp3...). ` +
+      `Vacío = quitar fuente.`,
+    valor: t.soundcloud || t.audio || actual});
+  if(resp === null) return;
+  const limpio2 = resp.replace(/\s+/g, '');
+  if(/^https?:\/\/.+\.(mp3|m4a|ogg|aac|wav|flac)(\?.*)?$/i.test(limpio2)){
+    t.audio = limpio2;
+    t.videoId = null;
+    delete t.soundcloud;
+    t.fuente = 'curador-audio';
+  } else if(/soundcloud\.com\//i.test(limpio2)){
+    t.soundcloud = limpio2.split('?')[0];
+    t.videoId = null;
+    delete t.audio;
+    t.fuente = 'curador-sc';
+  } else {
+    const m = limpio2.match(/(?:v=|youtu\.be\/|shorts\/)?([\w-]{11})(?:\W|$)/);
+    t.videoId = m ? m[1] : null;
+    delete t.audio;
+    delete t.soundcloud;
+    t.fuente = t.videoId ? 'curador' : undefined;
+  }
+  hayCambios = true;
+  pintarAlbumUI();
+  const btn = $('btn-guardar');
+  if(btn) btn.style.display = '';
+}
+
+function utoa(str){  // base64 con soporte unicode
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+async function guardarEnGitHub(){
+  if(!ALBUM._ruta){ avisar('Este álbum no es editable (vinilo o demo)'); return; }
+  const token = await pedirToken();
+  if(!token) return;
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}` +
+              `/contents/${ALBUM._ruta}`;
+  const cab = {'Authorization': 'Bearer ' + token,
+               'Accept': 'application/vnd.github+json'};
+  const limpio = {...ALBUM};
+  delete limpio._ruta;
+  const contenido = utoa(JSON.stringify(limpio));
+
+  let ok = false, ultimoError = '';
+  for(let intento = 1; intento <= 3 && !ok; intento++){
+    try{
+      const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
+      if(!r1.ok) throw new Error('leyendo archivo: ' + r1.status);
+      const sha = (await r1.json()).sha;
+      const r2 = await fetch(api, {
+        method: 'PUT', headers: cab,
+        body: JSON.stringify({
+          message: `curador: ${ALBUM.artista} — ${ALBUM.album}`,
+          content: contenido,
+          sha, branch: 'main'
+        })
+      });
+      if(r2.status === 409){
+        // la rama se movió (commit anterior aún asentándose): esperar y reintentar
+        ultimoError = '409 (conflicto)';
+        await new Promise(res => setTimeout(res, 2500));
+        continue;
+      }
+      if(!r2.ok) throw new Error('guardando: ' + r2.status);
+      ok = true;
+    }catch(e){
+      ultimoError = e.message;
+      if(String(e).includes('401')){ localStorage.removeItem('gh_token'); break; }
+      await new Promise(res => setTimeout(res, 2000));
+    }
+  }
+  if(ok){
+    hayCambios = false;
+    $('btn-guardar').style.display = 'none';
+    avisar('✓ Guardado en GitHub · el sitio se actualiza en 1-2 min');
+  }else{
+    avisar('⚠ Error tras 3 intentos: ' + ultimoError +
+           '\nEspera unos segundos y vuelve a pulsar GUARDAR');
+  }
+}
+
+async function eliminarAlbum(){
+  if(!ALBUM._ruta){ avisar('Este álbum no es eliminable (vinilo o demo)'); return; }
+  const seguro = await dialogo({
+    titulo: '🗑 ELIMINAR DEL CATÁLOGO',
+    mensaje: `${ALBUM.artista} — ${ALBUM.album}\n(${ALBUM.tracks.length} pistas)\n\n` +
+             `Se borra su archivo del repositorio.`,
+    valor: null});
+  if(!seguro) return;
+  const token = await pedirToken();
+  if(!token) return;
+  const cab = {'Authorization': 'Bearer ' + token,
+               'Accept': 'application/vnd.github+json'};
+  const base = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/`;
+  try{
+    // 1) borrar el fragmento del álbum
+    const r1 = await fetch(base + ALBUM._ruta + '?ref=main&t=' + Date.now(), {headers: cab});
+    if(r1.ok){
+      const sha = (await r1.json()).sha;
+      const rd = await fetch(base + ALBUM._ruta, {
+        method: 'DELETE', headers: cab,
+        body: JSON.stringify({
+          message: `curador: eliminar ${ALBUM.artista} — ${ALBUM.album}`,
+          sha, branch: 'main'})
+      });
+      if(!rd.ok) throw new Error('borrando archivo: ' + rd.status);
+    }
+    // 2) registrar la baja en eliminados.json (con reintentos ante 409)
+    const rutaElim = BASE + 'eliminados.json';
+    let ok = false;
+    for(let intento = 1; intento <= 3 && !ok; intento++){
+      let lista = [], shaE = null;
+      const rE = await fetch(base + rutaElim + '?ref=main&t=' + Date.now(), {headers: cab});
+      if(rE.ok){
+        const d = await rE.json();
+        shaE = d.sha;
+        try{ lista = JSON.parse(atob(d.content.replace(/\n/g,''))); }catch(_){}
+      }
+      if(!lista.includes(ALBUM.id)) lista.push(ALBUM.id);
+      const cuerpo = {message: `curador: baja #${ALBUM.id}`,
+                      content: btoa(JSON.stringify(lista)), branch: 'main'};
+      if(shaE) cuerpo.sha = shaE;
+      const rP = await fetch(base + rutaElim, {
+        method: 'PUT', headers: cab, body: JSON.stringify(cuerpo)});
+      if(rP.status === 409){ await new Promise(r=>setTimeout(r,2500)); continue; }
+      if(!rP.ok) throw new Error('actualizando bajas: ' + rP.status);
+      ok = true;
+    }
+    if(!ok) throw new Error('conflicto persistente en eliminados.json');
+    // 3) reflejar en la sesión actual
+    ELIMINADOS.add(ALBUM.id);
+    INDICE = INDICE.filter(e => e.id !== ALBUM.id);
+    stopTodo();
+    $('vista-player').style.display = 'none';
+    irTab(TAB);
+    pintarGrid();
+    avisar('✓ Álbum eliminado del catálogo');
+  }catch(e){
+    if(String(e).includes('401')) localStorage.removeItem('gh_token');
+    avisar('⚠ Error: ' + e.message);
+  }
+}
+
+/* ====================== VINILOS (Discogs) ====================== */
+let vinilosCargados=false, VINILOS=[];
+
+function similitud(a,b){
+  a=normalizar(a); b=normalizar(b);
+  if(!a||!b) return 0;
+  if(a.includes(b)||b.includes(a)) return 1;
+  const big=s=>{const r=new Set();
+    for(let i=0;i<s.length-1;i++) r.add(s.slice(i,i+2)); return r};
+  const A=big(a), B=big(b);
+  let inter=0; A.forEach(x=>{ if(B.has(x)) inter++; });
+  return 2*inter/((A.size+B.size)||1);
+}
+
+async function initVinilos(){
+  if(vinilosCargados) return;
+  vinilosCargados = true;
+  const st=$('vinilos-status');
+  st.textContent='CARGANDO COLECCIÓN...';
+  try{
+    let page=1, total=1;
+    while(page<=total && page<=15){
+      const r=await fetch(
+        `https://api.discogs.com/users/${CONFIG.DISCOGS_USER}` +
+        `/collection/folders/0/releases?token=${CONFIG.DISCOGS_TOKEN}` +
+        `&per_page=100&page=${page}&sort=artist`);
+      if(!r.ok) throw new Error('Discogs '+r.status);
+      const d=await r.json();
+      total=d.pagination.pages;
+      d.releases.forEach(rel=>VINILOS.push(rel.basic_information));
+      st.textContent=`CARGANDO... ${VINILOS.length}/${d.pagination.items}`;
+      page++;
+    }
+    st.textContent=`${VINILOS.length} VINILOS`;
+    pintarVinilos();
+  }catch(e){
+    st.textContent='ERROR CARGANDO DISCOGS';
+    vinilosCargados=false;
+  }
+}
+
+function pintarVinilos(){
+  const q=normalizar($('buscador-vinilos').value||'');
+  const cont=$('grid-vinilos');
+  cont.innerHTML='';
+  VINILOS.filter(b=>{
+    const artista=(b.artists&&b.artists[0]?b.artists[0].name:'');
+    return !q || normalizar(artista+' '+b.title).includes(q);
+  }).forEach(b=>{
+    const artista=((b.artists&&b.artists[0]?b.artists[0].name:'')||'')
+      .replace(/\s*\(\d+\)$/,'');
+    const div=document.createElement('div');
+    div.className='tarjeta';
+    const cara=b.cover_image
+      ? `<img src="${b.cover_image}" loading="lazy" alt="">`
+      : `<div class="cara-tipo"><b>${b.title}</b><i>${artista}</i></div>`;
+    div.innerHTML=`<div class="cara">${cara}</div>
+      <div class="datos"><b>${b.title}</b>
+      <span>${artista}${b.year?' · '+b.year:''}</span></div>`;
+    div.onclick=()=>abrirVinilo(b.id);
+    cont.appendChild(div);
+  });
+}
+
+async function abrirVinilo(id){
+  try{
+    const r=await fetch(
+      `https://api.discogs.com/releases/${id}?token=${CONFIG.DISCOGS_TOKEN}`);
+    const rel=await r.json();
+    const videos=(rel.videos||[]).map(v=>{
+      const m=(v.uri||'').match(/(?:v=|youtu\.be\/)([\w-]{11})/);
+      return m ? {videoId:m[1], titulo:v.title||''} : null;
+    }).filter(Boolean);
+    const tracks=(rel.tracklist||[])
+      .filter(t=>t.type_!=='heading')
+      .map((t,i)=>{
+        let dur=null;
+        if(t.duration){
+          const p=t.duration.split(':');
+          if(p.length===2) dur = (+p[0])*60 + (+p[1]);
+        }
+        let mejor=null, ms=0;
+        videos.forEach(v=>{
+          const s=similitud(t.title, v.titulo);
+          if(s>ms){ ms=s; mejor=v; }
+        });
+        return {num:i+1, titulo:t.title, duracion:dur,
+                videoId:(mejor && ms>=0.45) ? mejor.videoId : null};
+      });
+    const artista=((rel.artists&&rel.artists[0]?rel.artists[0].name:'')||'')
+      .replace(/\s*\(\d+\)$/,'');
+    abrirAlbumObjeto({
+      artista, album:rel.title, año:rel.year,
+      portada:(rel.images&&rel.images[0]?rel.images[0].uri:null),
+      generos:rel.genres||[], estilos:rel.styles||[],
+      pais:rel.country||null, tracks
+    }, false);
+  }catch(e){
+    avisar('⚠ No se pudo cargar el vinilo');
+  }
+}
+
+/* ====================== LAST.FM ====================== */
+let lastfmCargado=false;
+
+async function initLastfm(){
+  if(lastfmCargado) return;
+  lastfmCargado=true;
+  const llamar=(m,extra)=>fetch(
+    `https://ws.audioscrobbler.com/2.0/?method=${m}` +
+    `&user=${CONFIG.LASTFM_USER}&api_key=${CONFIG.LASTFM_KEY}` +
+    `&format=json${extra||''}`).then(r=>r.json());
+  try{
+    const [rec, top, loved] = await Promise.all([
+      llamar('user.getrecenttracks','&limit=12'),
+      llamar('user.gettopalbums','&period=1month&limit=12'),
+      llamar('user.getlovedtracks','&limit=12')
+    ]);
+    pintarListaLF('lf-recientes',
+      ((rec.recenttracks||{}).track||[]).map(t=>({
+        img:(t.image&&t.image[2]?t.image[2]['#text']:''),
+        t1:t.name, t2:(t.artist?t.artist['#text']:''),
+        extra:(t['@attr']&&t['@attr'].nowplaying)?'▶ AHORA':''})));
+    pintarListaLF('lf-top',
+      ((top.topalbums||{}).album||[]).map(a=>({
+        img:(a.image&&a.image[2]?a.image[2]['#text']:''),
+        t1:a.name, t2:(a.artist?a.artist.name:''),
+        extra:a.playcount+' esc.'})));
+    pintarListaLF('lf-loved',
+      ((loved.lovedtracks||{}).track||[]).map(t=>({
+        img:(t.image&&t.image[2]?t.image[2]['#text']:''),
+        t1:t.name, t2:(t.artist?t.artist.name:''),
+        extra:'❤'})));
+  }catch(e){
+    $('lf-recientes').textContent='Error cargando Last.fm';
+    lastfmCargado=false;
+  }
+}
+function pintarListaLF(id, items){
+  const c=$(id); c.innerHTML='';
+  items.forEach(it=>{
+    const d=document.createElement('div');
+    d.className='lf-item';
+    d.innerHTML=`${it.img?`<img src="${it.img}" alt="">`:'<div class="lf-ph"></div>'}
+      <div><b>${it.t1||''}</b><span>${it.t2||''}</span></div>
+      <i>${it.extra||''}</i>`;
+    c.appendChild(d);
+  });
+}
+
+/* ====================== ARRANQUE ====================== */
+(async function(){
+  document.querySelectorAll('.tab').forEach(b=>
+    b.onclick = ()=> irTab(b.dataset.tab));
+  $('buscador-vinilos').addEventListener('input', pintarVinilos);
+  await cargarIndice();
+  pintarChips();
+  pintarSelectores();
+  pintarGrid();
+})();
+</script>
+<div id="toast"></div>
+<div id="modal-dialogo" hidden>
+  <div class="ficha-caja">
+    <h4 id="dlg-titulo"></h4>
+    <p id="dlg-msg" style="font-size:12px;color:var(--texto);white-space:pre-line;margin:4px 0 2px;line-height:1.5"></p>
+    <input id="dlg-input" type="text" autocomplete="off" style="margin-top:8px">
+    <div class="ficha-botones">
+      <button class="ficha-no" onclick="cerrarDialogo(false)">CANCELAR</button>
+      <button class="ficha-ok" onclick="cerrarDialogo(true)">APLICAR</button>
+    </div>
+  </div>
+</div>
+<div id="modal-ficha" hidden>
+  <div class="ficha-caja">
+    <h4>✎ EDITAR FICHA</h4>
+    <label>ARTISTA</label>
+    <input id="ficha-artista" type="text" autocomplete="off">
+    <label>ÁLBUM</label>
+    <input id="ficha-album" type="text" autocomplete="off">
+    <label>AÑO</label>
+    <input id="ficha-anio" type="text" inputmode="numeric" autocomplete="off">
+    <label>GÉNEROS (separados por coma)</label>
+    <input id="ficha-generos" type="text" autocomplete="off" placeholder="Rock, Latin">
+    <label>ESTILOS (separados por coma)</label>
+    <input id="ficha-estilos" type="text" autocomplete="off" placeholder="Flamenco, Rumba">
+    <label>PAÍS (EDICIÓN)</label>
+    <input id="ficha-pais" type="text" autocomplete="off" placeholder="Spain">
+    <div class="ficha-botones">
+      <button class="ficha-no" onclick="cerrarFicha(false)">CANCELAR</button>
+      <button class="ficha-ok" onclick="cerrarFicha(true)">APLICAR</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
