@@ -734,6 +734,27 @@ function pintarAlbumUI(){
   });
   const be = $('btn-eliminar');
   if(be) be.style.display = (MODO_EDITAR && ALBUM._ruta) ? '' : 'none';
+  // herramientas de orden en la cabecera de la playlist (modo curador)
+  const cabPl = document.querySelector('.playlist-cab');
+  const viejoHerr = $('herr-orden');
+  if(viejoHerr) viejoHerr.remove();
+  if(MODO_EDITAR && ALBUM._ruta && !RADIO){
+    const cont = document.createElement('span');
+    cont.id = 'herr-orden';
+    cont.style.cssText = 'margin-left:auto;display:flex;gap:8px';
+    const b1 = document.createElement('button');
+    b1.textContent = '⇅ POR №';
+    b1.title = 'Reordenar las pistas según su número';
+    b1.style.cssText = 'background:none;border:1px solid var(--linea);color:var(--texto-tenue);border-radius:4px;font-size:9px;letter-spacing:.08em;cursor:pointer;padding:2px 7px;font-family:inherit';
+    b1.onclick = ordenarPorNum;
+    const b2 = document.createElement('button');
+    b2.textContent = '№ RENUMERAR';
+    b2.title = 'Asignar 1,2,3... según el orden actual';
+    b2.style.cssText = b1.style.cssText;
+    b2.onclick = renumerar;
+    cont.appendChild(b1); cont.appendChild(b2);
+    cabPl.appendChild(cont);
+  }
   // botón de edición de ficha (modo curador)
   const viejoBF = $('btn-ficha');
   if(viejoBF) viejoBF.remove();
@@ -758,6 +779,15 @@ function pintarAlbumUI(){
       <span class="titulo">${t.titulo||'—'}${reproducible(t)?'':' · (sin fuente)'}${t.audio?' · ♪':''}${t.soundcloud?' · ☁':''}</span>
       <span class="dur">${fmt(t.duracion)}</span>`;
     if(MODO_EDITAR && ALBUM._ruta){
+      const sube=document.createElement('button');
+      sube.textContent='▲'; sube.title='Subir pista';
+      sube.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:10px;padding:0 2px';
+      sube.onclick=ev=>{ ev.stopPropagation(); moverPista(i,-1); };
+      const baja=document.createElement('button');
+      baja.textContent='▼'; baja.title='Bajar pista';
+      baja.style.cssText=sube.style.cssText;
+      baja.onclick=ev=>{ ev.stopPropagation(); moverPista(i,1); };
+      div.appendChild(sube); div.appendChild(baja);
       const busca=document.createElement('a');
       busca.textContent='🔎'; busca.title='Buscar en YouTube';
       busca.href='https://www.youtube.com/results?search_query='+
@@ -1140,6 +1170,9 @@ function editarFicha(){
   $('ficha-artista').value = ALBUM.artista || '';
   $('ficha-album').value = ALBUM.album || '';
   $('ficha-anio').value = ALBUM.año || '';
+  $('ficha-generos').value = (ALBUM.generos || []).join(', ');
+  $('ficha-estilos').value = (ALBUM.estilos || []).join(', ');
+  $('ficha-pais').value = ALBUM.pais || '';
   $('modal-ficha').hidden = false;
   $('ficha-artista').focus();
 }
@@ -1150,10 +1183,46 @@ function cerrarFicha(aplicar){
   ALBUM.album = $('ficha-album').value.trim() || null;
   const n = parseInt($('ficha-anio').value.trim());
   ALBUM.año = isNaN(n) ? null : n;
+  const alista = campo => campo.split(',').map(x=>x.trim()).filter(Boolean);
+  const gs = alista($('ficha-generos').value);
+  const es = alista($('ficha-estilos').value);
+  ALBUM.generos = gs.length ? gs : null;
+  ALBUM.estilos = es.length ? es : null;
+  ALBUM.pais = $('ficha-pais').value.trim() || null;
   hayCambios = true;
   pintarAlbumUI();
   const btn = $('btn-guardar');
   if(btn) btn.style.display = '';
+}
+
+function marcarSucio(){
+  hayCambios = true;
+  const btn = $('btn-guardar');
+  if(btn) btn.style.display = '';
+}
+function moverPista(i, dir){
+  const j = i + dir;
+  if(j < 0 || j >= ALBUM.tracks.length) return;
+  [ALBUM.tracks[i], ALBUM.tracks[j]] = [ALBUM.tracks[j], ALBUM.tracks[i]];
+  if(pista === i) pista = j; else if(pista === j) pista = i;
+  regenerarOrden();
+  posOrden = Math.max(0, orden.indexOf(pista));
+  marcarSucio();
+  pintarAlbumUI();
+}
+function renumerar(){
+  ALBUM.tracks.forEach((t, k)=>{ t.num = k + 1; });
+  marcarSucio();
+  pintarAlbumUI();
+}
+function ordenarPorNum(){
+  const actual = ALBUM.tracks[pista];
+  ALBUM.tracks.sort((a, b)=>(a.num || 999) - (b.num || 999));
+  pista = Math.max(0, ALBUM.tracks.indexOf(actual));
+  regenerarOrden();
+  posOrden = Math.max(0, orden.indexOf(pista));
+  marcarSucio();
+  pintarAlbumUI();
 }
 
 function editarPortada(){
@@ -1496,6 +1565,12 @@ function pintarListaLF(id, items){
     <input id="ficha-album" type="text" autocomplete="off">
     <label>AÑO</label>
     <input id="ficha-anio" type="text" inputmode="numeric" autocomplete="off">
+    <label>GÉNEROS (separados por coma)</label>
+    <input id="ficha-generos" type="text" autocomplete="off" placeholder="Rock, Latin">
+    <label>ESTILOS (separados por coma)</label>
+    <input id="ficha-estilos" type="text" autocomplete="off" placeholder="Flamenco, Rumba">
+    <label>PAÍS (EDICIÓN)</label>
+    <input id="ficha-pais" type="text" autocomplete="off" placeholder="Spain">
     <div class="ficha-botones">
       <button class="ficha-no" onclick="cerrarFicha(false)">CANCELAR</button>
       <button class="ficha-ok" onclick="cerrarFicha(true)">APLICAR</button>
