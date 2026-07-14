@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- etiqueta del disco -->
+  <circle cx="256" cy="256" r="240" fill="#e8a33d"/>
+  <!-- anillo sutil del borde de la etiqueta -->
+  <circle cx="256" cy="256" r="214" fill="none" stroke="#000" stroke-opacity="0.14" stroke-width="5"/>
+  <!-- letra K: asta vertical -->
+  <rect x="146" y="116" width="62" height="280" fill="#ffffff"/>
+  <!-- brazos diagonales que convergen en el centro del disco -->
+  <path d="M 208 256 L 344 118" stroke="#ffffff" stroke-width="62" stroke-linecap="butt"/>
+  <path d="M 208 256 L 344 394" stroke="#ffffff" stroke-width="62" stroke-linecap="butt"/>
+  <!-- agujero del vinilo en el vértice de la K -->
+  <circle cx="236" cy="256" r="24" fill="#16181c"/>
+</svg>
