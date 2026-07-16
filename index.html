@@ -1318,8 +1318,9 @@ async function editarPortada(){
       `Pega la URL de la imagen. Vacío = quitar portada.`,
     valor: ALBUM.portada || ''});
   if(resp === null) return;
-  // limpiar espacios y saltos de línea que se cuelan al copiar URLs largas
-  ALBUM.portada = resp.replace(/\s+/g, '') || null;
+  // limpiar saltos de línea del copy-paste y codificar espacios reales (en vez
+  // de borrarlos, que rompe imágenes con espacios en el nombre de archivo)
+  ALBUM.portada = resp.trim().replace(/[\r\n\t]+/g, '').replace(/ /g, '%20') || null;
   hayCambios = true;
   pintarAlbumUI();
   const btn = $('btn-guardar');
@@ -1336,7 +1337,10 @@ async function editarPista(i){
       `Vacío = quitar fuente.`,
     valor: t.soundcloud || t.audio || actual});
   if(resp === null) return;
-  const limpio2 = resp.replace(/\s+/g, '');
+  // limpiar solo saltos de línea/tabs del copy-paste, y codificar los espacios
+  // reales del nombre de archivo en vez de borrarlos (archive.org y otros
+  // hosts suelen tener mp3 con espacios en el nombre: "01- Cancion.mp3")
+  const limpio2 = resp.trim().replace(/[\r\n\t]+/g, '').replace(/ /g, '%20');
   if(/^https?:\/\/.+\.(mp3|m4a|ogg|aac|wav|flac)(\?.*)?$/i.test(limpio2)){
     t.audio = limpio2;
     t.videoId = null;
