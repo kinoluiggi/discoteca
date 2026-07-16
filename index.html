@@ -1739,13 +1739,46 @@ const EFECTOS = {
     n.start(t); n.stop(t+dur);
   }
 };
+/* samples reales desde efectos/*.mp3, con síntesis de respaldo */
+const SAMPLES = {};          // nombre -> AudioBuffer
+const SAMPLE_ESTADO = {};    // nombre -> 'cargando' | 'ok' | 'no'
+async function cargarSample(nombre){
+  if(SAMPLE_ESTADO[nombre]) return;
+  SAMPLE_ESTADO[nombre] = 'cargando';
+  try{
+    const r = await fetch('efectos/' + nombre + '.mp3');
+    if(!r.ok) throw 0;
+    const datos = await r.arrayBuffer();
+    SAMPLES[nombre] = await fxCtx().decodeAudioData(datos);
+    SAMPLE_ESTADO[nombre] = 'ok';
+  }catch(_){
+    SAMPLE_ESTADO[nombre] = 'no';   // no existe: se usará síntesis
+  }
+}
+function tocarFX(nombre){
+  const ctx = fxCtx();
+  if(SAMPLES[nombre]){
+    const src = ctx.createBufferSource();
+    src.buffer = SAMPLES[nombre];
+    src.connect(FX.master);
+    src.start();
+    return;
+  }
+  if(!SAMPLE_ESTADO[nombre]) cargarSample(nombre);  // para la próxima
+  EFECTOS[nombre]();   // respaldo sintetizado
+}
+
 $('btn-fx').onclick = ()=>{
   const fila=$('fx-fila');
   fila.classList.toggle('ver');
   $('btn-fx').classList.toggle('activo', fila.classList.contains('ver'));
+  if(fila.classList.contains('ver')){
+    fxCtx();  // despertar el audio con el gesto del usuario
+    Object.keys(EFECTOS).forEach(cargarSample);
+  }
 };
 document.querySelectorAll('.fx-btn').forEach(b=>{
-  b.onclick = ()=> EFECTOS[b.dataset.fx]();
+  b.onclick = ()=> tocarFX(b.dataset.fx);
 });
 const FX_TECLAS = {'1':'airhorn','2':'scratch','3':'rewind',
                    '4':'siren','5':'laser','6':'brake'};
@@ -1753,7 +1786,7 @@ document.addEventListener('keydown', ev=>{
   if(ev.target.tagName==='INPUT' || ev.target.tagName==='TEXTAREA') return;
   if(!$('modal-dialogo').hidden || !$('modal-ficha').hidden) return;
   const fx = FX_TECLAS[ev.key];
-  if(fx && $('fx-fila').classList.contains('ver')) EFECTOS[fx]();
+  if(fx && $('fx-fila').classList.contains('ver')) tocarFX(fx);
 });
 
 /* ====================== ARRANQUE ====================== */
