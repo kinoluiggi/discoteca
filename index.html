@@ -82,6 +82,20 @@ header .sub{font-size:11px;letter-spacing:.16em;color:var(--texto-tenue)}
   opacity:0;pointer-events:none;transition:opacity .25s;white-space:pre-line;
   box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:80vw;text-align:center}
 #toast.ver{opacity:1}
+/* pad de efectos DJ */
+.fx-fila{display:none;gap:8px;flex-wrap:wrap;padding:2px 18px 14px;align-items:center}
+.fx-fila.ver{display:flex}
+.fx-btn{
+  background:linear-gradient(180deg,#2b2333,#1d1825);
+  border:1px solid #4a3a5a;border-radius:6px;color:#c9a3e8;
+  min-width:64px;height:40px;font-size:10px;letter-spacing:.08em;
+  cursor:pointer;font-family:inherit;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  transition:transform .06s, box-shadow .15s;
+}
+.fx-btn span{font-size:15px}
+.fx-btn:active{transform:translateY(2px);box-shadow:0 0 14px rgba(201,163,232,.5)}
+.fx-btn i{font-style:normal;font-size:8px;color:#7a6a8a}
 
 /* ============ CONTROLES DEL GRID ============ */
 .controles{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 26px}
@@ -391,6 +405,14 @@ input[type=range]::-moz-range-thumb{
         <input type="range" id="seek" min="0" max="1000" value="0">
         <span class="tiempo" id="t-total">0:00</span>
       </div>
+      <div class="fx-fila" id="fx-fila">
+        <button class="fx-btn" data-fx="airhorn"><span>📣</span>AIRHORN<i>1</i></button>
+        <button class="fx-btn" data-fx="scratch"><span>💿</span>SCRATCH<i>2</i></button>
+        <button class="fx-btn" data-fx="rewind"><span>⏪</span>REWIND<i>3</i></button>
+        <button class="fx-btn" data-fx="siren"><span>🚨</span>SIRENA<i>4</i></button>
+        <button class="fx-btn" data-fx="laser"><span>⚡</span>LÁSER<i>5</i></button>
+        <button class="fx-btn" data-fx="brake"><span>🛑</span>FRENO<i>6</i></button>
+      </div>
       <div class="linea-botones">
         <button class="boton" id="btn-prev" aria-label="Anterior">⏮</button>
         <button class="boton principal" id="btn-play" aria-label="Play/Pausa">▶</button>
@@ -398,6 +420,7 @@ input[type=range]::-moz-range-thumb{
         <button class="boton" id="btn-next" aria-label="Siguiente">⏭</button>
         <button class="boton modo" id="btn-shuffle" aria-label="Aleatorio">⤮ ALEATORIO</button>
         <button class="boton modo" id="btn-repeat" aria-label="Repetir disco">↻ REPETIR</button>
+        <button class="boton modo" id="btn-fx" aria-label="Efectos DJ">🎛 FX</button>
         <div class="analizador" id="analizador"></div>
         <div class="vol-zona">
           <span>VOL</span><input type="range" id="vol" min="0" max="100" value="80">
@@ -1599,6 +1622,139 @@ function pintarListaLF(id, items){
     c.appendChild(d);
   });
 }
+
+/* ====================== EFECTOS DJ (Web Audio, sintetizados) ====================== */
+const FX = {ctx:null, master:null};
+function fxCtx(){
+  if(!FX.ctx){
+    FX.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    FX.master = FX.ctx.createGain();
+    FX.master.gain.value = 0.7;
+    FX.master.connect(FX.ctx.destination);
+  }
+  if(FX.ctx.state === 'suspended') FX.ctx.resume();
+  return FX.ctx;
+}
+function fxRuido(ctx, dur){
+  const buf = ctx.createBuffer(1, ctx.sampleRate*dur, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  return src;
+}
+const EFECTOS = {
+  airhorn(){
+    const ctx=fxCtx(), t=ctx.currentTime;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(.5,t+.02);
+    g.gain.setValueAtTime(.5,t+.85);
+    g.gain.exponentialRampToValueAtTime(.001,t+1.15);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2400;
+    g.connect(lp); lp.connect(FX.master);
+    [-8,0,9].forEach(det=>{
+      const o=ctx.createOscillator();
+      o.type='sawtooth'; o.detune.value=det;
+      o.frequency.setValueAtTime(370,t);
+      o.frequency.linearRampToValueAtTime(465,t+.09);
+      // los tres toques clásicos
+      o.frequency.setValueAtTime(465,t+.30);
+      o.frequency.setValueAtTime(370,t+.32);
+      o.frequency.linearRampToValueAtTime(465,t+.40);
+      o.frequency.setValueAtTime(465,t+.55);
+      o.frequency.setValueAtTime(370,t+.57);
+      o.frequency.linearRampToValueAtTime(465,t+.65);
+      o.connect(g); o.start(t); o.stop(t+1.2);
+    });
+  },
+  scratch(){
+    const ctx=fxCtx(), t=ctx.currentTime;
+    const src=fxRuido(ctx,.6);
+    src.playbackRate.setValueAtTime(1.2,t);
+    src.playbackRate.linearRampToValueAtTime(3.2,t+.06);
+    src.playbackRate.linearRampToValueAtTime(.4,t+.14);
+    src.playbackRate.linearRampToValueAtTime(2.8,t+.21);
+    src.playbackRate.linearRampToValueAtTime(.5,t+.30);
+    src.playbackRate.linearRampToValueAtTime(2.2,t+.38);
+    const bp=ctx.createBiquadFilter(); bp.type='bandpass';
+    bp.frequency.value=1400; bp.Q.value=3.5;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(.55,t);
+    g.gain.setTargetAtTime(0,t+.34,.05);
+    src.connect(bp); bp.connect(g); g.connect(FX.master);
+    src.start(t); src.stop(t+.5);
+  },
+  rewind(){
+    const ctx=fxCtx(), t=ctx.currentTime, dur=.9;
+    const o=ctx.createOscillator(); o.type='sawtooth';
+    const pasos=40, curva=new Float32Array(pasos);
+    for(let i=0;i<pasos;i++){
+      const p=i/pasos;
+      curva[i]=900*Math.pow(.09,p)*(1+.25*Math.sin(p*40));
+    }
+    o.frequency.setValueCurveAtTime(curva,t,dur);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(.35,t);
+    g.gain.setTargetAtTime(0,t+dur-.1,.06);
+    o.connect(g); g.connect(FX.master);
+    o.start(t); o.stop(t+dur);
+  },
+  siren(){
+    const ctx=fxCtx(), t=ctx.currentTime, dur=1.5;
+    const o=ctx.createOscillator(); o.type='square';
+    for(let i=0;i<8;i++) o.frequency.setValueAtTime(i%2?920:610, t+i*.19);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2800;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(.22,t);
+    g.gain.setTargetAtTime(0,t+dur-.15,.08);
+    o.connect(lp); lp.connect(g); g.connect(FX.master);
+    o.start(t); o.stop(t+dur);
+  },
+  laser(){
+    const ctx=fxCtx(), t=ctx.currentTime;
+    const o=ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(1900,t);
+    o.frequency.exponentialRampToValueAtTime(110,t+.32);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(.45,t);
+    g.gain.exponentialRampToValueAtTime(.001,t+.35);
+    o.connect(g); g.connect(FX.master);
+    o.start(t); o.stop(t+.4);
+  },
+  brake(){
+    const ctx=fxCtx(), t=ctx.currentTime, dur=.75;
+    const o=ctx.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(260,t);
+    o.frequency.exponentialRampToValueAtTime(28,t+dur);
+    const n=fxRuido(ctx,dur);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass';
+    lp.frequency.setValueAtTime(1200,t);
+    lp.frequency.exponentialRampToValueAtTime(90,t+dur);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(.4,t);
+    g.gain.setTargetAtTime(0,t+dur-.12,.07);
+    o.connect(g); n.connect(lp); lp.connect(g); g.connect(FX.master);
+    o.start(t); o.stop(t+dur);
+    n.start(t); n.stop(t+dur);
+  }
+};
+$('btn-fx').onclick = ()=>{
+  const fila=$('fx-fila');
+  fila.classList.toggle('ver');
+  $('btn-fx').classList.toggle('activo', fila.classList.contains('ver'));
+};
+document.querySelectorAll('.fx-btn').forEach(b=>{
+  b.onclick = ()=> EFECTOS[b.dataset.fx]();
+});
+const FX_TECLAS = {'1':'airhorn','2':'scratch','3':'rewind',
+                   '4':'siren','5':'laser','6':'brake'};
+document.addEventListener('keydown', ev=>{
+  if(ev.target.tagName==='INPUT' || ev.target.tagName==='TEXTAREA') return;
+  if(!$('modal-dialogo').hidden || !$('modal-ficha').hidden) return;
+  const fx = FX_TECLAS[ev.key];
+  if(fx && $('fx-fila').classList.contains('ver')) EFECTOS[fx]();
+});
 
 /* ====================== ARRANQUE ====================== */
 (async function(){
