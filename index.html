@@ -474,11 +474,13 @@ input[type=range]::-moz-range-thumb{
   <div class="controles">
     <input class="buscador" id="buscador-novedades" type="search"
            placeholder="Buscar en novedades..." autocomplete="off">
+    <button class="chip activo" id="nov-modo-recientes" onclick="novModo('recientes')">RECIENTES · 2 MESES</button>
+    <button class="chip" id="nov-modo-todas" onclick="novModo('todas')">TODAS</button>
     <button class="btn-azar" id="btn-pegar-novedades" style="display:none">➕ PEGAR LISTADO</button>
     <div class="contador" id="novedades-status"></div>
   </div>
   <div id="novedades-revision" style="display:none;padding:0 26px 20px"></div>
-  <div class="lf-cols" style="grid-template-columns:1fr" id="novedades-lista"></div>
+  <div class="grid" id="novedades-lista"></div>
 </div>
 
 <!-- ================= VISTA PLAYER ================= -->
@@ -2509,30 +2511,134 @@ async function initNovedades(){
   st.textContent = NOVEDADES.length ? `${NOVEDADES.length} DESCARGAS` : '';
   pintarNovedades();
 }
+/* carátulas vía iTunes Search API (pública, sin clave), con caché local */
+function leerCacheCaratulas(){
+  try{ return JSON.parse(localStorage.getItem('itunes_cache_nov') || '{}'); }catch(_){ return {}; }
+}
+function guardarCacheCaratulas(c){
+  try{ localStorage.setItem('itunes_cache_nov', JSON.stringify(c)); }catch(_){}
+}
+async function buscarCaratula(artista, album){
+  const clave = (artista + '::' + album).toLowerCase().trim();
+  const c = leerCacheCaratulas();
+  if(Object.prototype.hasOwnProperty.call(c, clave)) return c[clave];
+  try{
+    const q = encodeURIComponent(`${artista} ${album}`.trim());
+    const r = await fetch(`https://itunes.apple.com/search?term=${q}&entity=album&limit=1`);
+    const d = await r.json();
+    let url = (d.results && d.results[0]) ? d.results[0].artworkUrl100 : null;
+    if(url) url = url.replace('100x100bb', '600x600bb');
+    c[clave] = url;
+    guardarCacheCaratulas(c);
+    return url;
+  }catch(_){ return null; }
+}
+
+let novModoActual = 'recientes';
+function novModo(m){
+  novModoActual = m;
+  $('nov-modo-recientes').classList.toggle('activo', m === 'recientes');
+  $('nov-modo-todas').classList.toggle('activo', m === 'todas');
+  pintarNovedades();
+}
 function pintarNovedades(){
   const q = normalizar($('buscador-novedades').value || '');
   const cont = $('novedades-lista');
   cont.innerHTML = '';
-  const lista = [...NOVEDADES]
+  const hoy = new Date();
+  let lista = [...NOVEDADES]
     .filter(n => !q || normalizar(n.carpeta + ' ' + (n.artista||'') + ' ' + (n.album||'')).includes(q))
+    .filter(n => {
+      if(novModoActual !== 'recientes' || !n.fecha) return true;
+      const dias = (hoy - new Date(n.fecha + 'T00:00:00')) / 86400000;
+      return dias <= 60;
+    })
     .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   if(!lista.length){
-    cont.innerHTML = '<div class="lf-vacio">Sin novedades todavía' +
+    cont.innerHTML = '<div class="lf-vacio">' +
+      (novModoActual === 'recientes' ? 'Nada en los últimos 2 meses · prueba TODAS' : 'Sin novedades todavía') +
       (MODO_EDITAR ? ' · usa ➕ PEGAR LISTADO' : '') + '</div>';
     return;
   }
   lista.forEach(n => {
-    const d = document.createElement('div');
-    d.className = 'lf-track';
-    d.innerHTML = `<span class="lf-num" style="width:80px">${n.fecha || ''}</span>
-      <div class="lf-txt"><b>${n.album || n.carpeta}</b>
-      <span>${n.artista || ''}${n.año ? ' · ' + n.año : ''}</span></div>
-      <i>▶ escuchar</i>`;
-    d.onclick = () => abrirListaLF(
-      n.artista ? `${n.artista} — ${n.album}` : n.carpeta,
-      [pistaLF(n.artista || '', n.album || n.carpeta, 1)], 0);
-    cont.appendChild(d);
+    const artista = n.artista || '', album = n.album || n.carpeta;
+    const div = document.createElement('div');
+    div.className = 'tarjeta';
+    div.innerHTML = `<div class="cara"><div class="cara-tipo"><b>${album}</b>
+        <i>${artista}${n.año ? ' · ' + n.año : ''}</i></div></div>
+      <div class="datos"><b>${album}</b><span>${artista}${n.fecha ? ' · ' + n.fecha : ''}</span></div>
+      ${MODO_EDITAR ? '<button class="chip" style="margin-top:6px;font-size:9px;padding:3px 8px">➕ A LA DISCOTECA</button>' : ''}`;
+    div.onclick = ev => {
+      if(ev.target.tagName === 'BUTTON') return;
+      escucharNovedad(n, div);
+    };
+    const btnConvertir = div.querySelector('button');
+    if(btnConvertir) btnConvertir.onclick = ev => { ev.stopPropagation(); convertirNovedadEnAlbum(n); };
+    cont.appendChild(div);
+    if(artista || album){
+      buscarCaratula(artista, album).then(url => {
+        if(url) div.querySelector('.cara').innerHTML = `<img src="${url}" loading="lazy" alt="">`;
+      });
+    }
   });
+}
+/* intenta encontrar el disco real en Discogs, para abrirlo con su tracklist
+   real (igual que un vinilo) en vez de un solo video de "álbum completo" */
+async function buscarReleaseDiscogs(artista, album){
+  try{
+    const q = encodeURIComponent(`${artista} ${album}`.trim());
+    const r = await fetch(`https://api.discogs.com/database/search?q=${q}` +
+      `&type=release&token=${CONFIG.DISCOGS_TOKEN}&per_page=1`);
+    const d = await r.json();
+    return (d.results && d.results[0]) ? d.results[0].id : null;
+  }catch(_){ return null; }
+}
+/* si no está en Discogs, intenta sacar el listado de pistas de iTunes */
+async function buscarPistasITunes(artista, album){
+  try{
+    const q = encodeURIComponent(`${artista} ${album}`.trim());
+    const r = await fetch(`https://itunes.apple.com/search?term=${q}&entity=album&limit=1`);
+    const d = await r.json();
+    const col = d.results && d.results[0];
+    if(!col) return null;
+    const r2 = await fetch(`https://itunes.apple.com/lookup?id=${col.collectionId}&entity=song`);
+    const d2 = await r2.json();
+    const canciones = (d2.results || []).filter(x => x.wrapperType === 'track')
+      .sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0))
+      .map(x => x.trackName);
+    return canciones.length ? canciones : null;
+  }catch(_){ return null; }
+}
+/* abre una novedad: pistas reales si se encuentra el disco (Discogs o
+   iTunes), o como último recurso un solo "track" con el álbum completo */
+async function escucharNovedad(n, tarjetaEl){
+  const artista = n.artista || '', album = n.album || n.carpeta;
+  if(tarjetaEl) tarjetaEl.style.opacity = '.5';
+  const discogsId = await buscarReleaseDiscogs(artista, album);
+  if(discogsId){
+    if(tarjetaEl) tarjetaEl.style.opacity = '';
+    abrirVinilo(discogsId);
+    return;
+  }
+  const pistas = await buscarPistasITunes(artista, album);
+  if(tarjetaEl) tarjetaEl.style.opacity = '';
+  if(pistas){
+    abrirListaLF(`${artista} — ${album}`, pistas.map((t, i) => pistaLF(artista, t, i + 1)), 0);
+    return;
+  }
+  abrirListaLF(artista ? `${artista} — ${album}` : n.carpeta, [pistaLF(artista, album, 1)], 0);
+}
+function convertirNovedadEnAlbum(n){
+  const nuevoId = 1 + INDICE.reduce((m, e) => Math.max(m, e.id || 0), 0);
+  const rutaIndice = `albumes/${nuevoId}.json`;
+  const alb = {
+    id: nuevoId, artista: n.artista || null, album: n.album || n.carpeta,
+    año: n.año ? Number(n.año) : null, portada: null, generos: [], estilos: [], pais: null,
+    tracks: [], _ruta: BASE + rutaIndice, _rutaIndice: rutaIndice, _nuevoEnIndice: true
+  };
+  irTab('discoteca');
+  abrirAlbumObjeto(alb, false);
+  editarFicha();
 }
 
 /* ---------- modo curador: pegar listado, revisar y guardar ---------- */
