@@ -2567,13 +2567,18 @@ function pintarNovedades(){
     div.innerHTML = `<div class="cara"><div class="cara-tipo"><b>${album}</b>
         <i>${artista}${n.año ? ' · ' + n.año : ''}</i></div></div>
       <div class="datos"><b>${album}</b><span>${artista}${n.fecha ? ' · ' + n.fecha : ''}</span></div>
-      ${MODO_EDITAR ? '<button class="chip" style="margin-top:6px;font-size:9px;padding:3px 8px">➕ A LA DISCOTECA</button>' : ''}`;
+      ${MODO_EDITAR ? `<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">
+        <button class="chip nov-btn-convertir" style="font-size:9px;padding:3px 8px">➕ A LA DISCOTECA</button>
+        <button class="chip nov-btn-quitar" style="font-size:9px;padding:3px 8px">✕ QUITAR</button>
+      </div>` : ''}`;
     div.onclick = ev => {
       if(ev.target.tagName === 'BUTTON') return;
       escucharNovedad(n, div);
     };
-    const btnConvertir = div.querySelector('button');
+    const btnConvertir = div.querySelector('.nov-btn-convertir');
     if(btnConvertir) btnConvertir.onclick = ev => { ev.stopPropagation(); convertirNovedadEnAlbum(n); };
+    const btnQuitar = div.querySelector('.nov-btn-quitar');
+    if(btnQuitar) btnQuitar.onclick = ev => { ev.stopPropagation(); eliminarNovedad(n); };
     cont.appendChild(div);
     if(artista || album){
       buscarCaratula(artista, album).then(url => {
@@ -2702,6 +2707,47 @@ function cancelarRevisionNovedades(){
   novedadesRevision = [];
   $('novedades-revision').style.display = 'none';
   $('novedades-revision').innerHTML = '';
+}
+async function eliminarNovedad(n){
+  const seguro = await dialogo({
+    titulo: '✕ QUITAR DE NOVEDADES',
+    mensaje: `${n.artista ? n.artista + ' — ' : ''}${n.album || n.carpeta}\n\n` +
+      `Solo desaparece de esta lista, no borra nada del catálogo.`,
+    valor: null});
+  if(!seguro) return;
+  const token = await pedirToken();
+  if(!token) return;
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${BASE}novedades.json`;
+  const cab = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'};
+  let ok = false, ultimoError = '';
+  for(let intento = 1; intento <= 3 && !ok; intento++){
+    try{
+      const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
+      if(!r1.ok) throw new Error('leyendo novedades: ' + r1.status);
+      const d = await r1.json();
+      let lista = [];
+      try{ lista = JSON.parse(utoaDecode(d.content)); }catch(_){ lista = []; }
+      lista = lista.filter(x => x.carpeta !== n.carpeta);
+      const r2 = await fetch(api, {method: 'PUT', headers: cab, body: JSON.stringify({
+        message: `curador: quitar novedad — ${n.carpeta}`,
+        content: utoa(JSON.stringify(lista)), sha: d.sha, branch: 'main'
+      })});
+      if(r2.status === 409){ ultimoError = '409 (conflicto)'; await new Promise(r=>setTimeout(r,2500)); continue; }
+      if(!r2.ok) throw new Error('guardando: ' + r2.status);
+      NOVEDADES = lista;
+      ok = true;
+    }catch(e){
+      ultimoError = e.message;
+      if(String(e).includes('401')){ localStorage.removeItem('gh_token'); break; }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  if(ok){
+    pintarNovedades();
+    avisar('✓ Quitada de Novedades');
+  }else{
+    avisar('⚠ Error tras 3 intentos: ' + ultimoError);
+  }
 }
 async function guardarNovedades(){
   const token = await pedirToken();
