@@ -341,6 +341,7 @@ input[type=range]::-moz-range-thumb{
   <button class="tab activo" data-tab="discoteca">DISCOTECA</button>
   <button class="tab" data-tab="vinilos">VINILOS</button>
   <button class="tab" data-tab="lastfm">LAST.FM</button>
+  <button class="tab" data-tab="novedades">NOVEDADES</button>
 </nav>
 
 <!-- ================= VISTA GRID ================= -->
@@ -466,6 +467,18 @@ input[type=range]::-moz-range-thumb{
     <p class="lf-intro" id="retro-intro">Hoy, pero hace años: qué sonaba este mismo día en ediciones anteriores.</p>
     <div id="retro-lista"><div class="lf-cargando">Cargando…</div></div>
   </div>
+</div>
+
+<!-- ================= VISTA NOVEDADES ================= -->
+<div id="vista-novedades" style="display:none">
+  <div class="controles">
+    <input class="buscador" id="buscador-novedades" type="search"
+           placeholder="Buscar en novedades..." autocomplete="off">
+    <button class="btn-azar" id="btn-pegar-novedades" style="display:none">➕ PEGAR LISTADO</button>
+    <div class="contador" id="novedades-status"></div>
+  </div>
+  <div id="novedades-revision" style="display:none;padding:0 26px 20px"></div>
+  <div class="lf-cols" style="grid-template-columns:1fr" id="novedades-lista"></div>
 </div>
 
 <!-- ================= VISTA PLAYER ================= -->
@@ -906,7 +919,12 @@ function pintarAlbumUI(){
     b3.title = 'Añadir una pista nueva al final';
     b3.style.cssText = b1.style.cssText;
     b3.onclick = agregarPista;
-    cont.appendChild(b1); cont.appendChild(b2); cont.appendChild(b3);
+    const b4 = document.createElement('button');
+    b4.textContent = '➕ VARIAS';
+    b4.title = 'Pegar varias pistas de golpe (una por línea)';
+    b4.style.cssText = b1.style.cssText;
+    b4.onclick = agregarVariasPistas;
+    cont.appendChild(b1); cont.appendChild(b2); cont.appendChild(b3); cont.appendChild(b4);
     cabPl.appendChild(cont);
   }
   // botón de edición de ficha (modo curador)
@@ -972,22 +990,23 @@ function pintarAlbumUI(){
 }
 
 let TAB = 'discoteca';
-const VISTAS = {discoteca:'vista-grid', vinilos:'vista-vinilos', lastfm:'vista-lastfm'};
+const VISTAS = {discoteca:'vista-grid', vinilos:'vista-vinilos', lastfm:'vista-lastfm', novedades:'vista-novedades'};
 function irTab(t){
   TAB = t;
-  ['vista-grid','vista-vinilos','vista-lastfm','vista-player']
+  ['vista-grid','vista-vinilos','vista-lastfm','vista-novedades','vista-player']
     .forEach(id=>$(id).style.display='none');
   $(VISTAS[t]).style.display='block';
   document.querySelectorAll('.tab').forEach(b=>
     b.classList.toggle('activo', b.dataset.tab===t));
   if(t==='vinilos') initVinilos();
   if(t==='lastfm') initLastfm();
+  if(t==='novedades') initNovedades();
 }
 
 let scrollGuardado = 0;
 function mostrarPlayer(){
   scrollGuardado = window.scrollY;
-  ['vista-grid','vista-vinilos','vista-lastfm']
+  ['vista-grid','vista-vinilos','vista-lastfm','vista-novedades']
     .forEach(id=>$(id).style.display='none');
   $('vista-player').style.display='block';
   window.scrollTo(0,0);
@@ -1342,24 +1361,33 @@ function dialogo(opts){
     $('dlg-titulo').textContent = opts.titulo || '';
     $('dlg-msg').textContent = opts.mensaje || '';
     $('dlg-msg').style.display = opts.mensaje ? '' : 'none';
-    const inp = $('dlg-input');
-    if(opts.valor === null || opts.valor === undefined){
+    const inp = $('dlg-input'), area = $('dlg-textarea');
+    if(opts.textarea){
       inp.style.display = 'none';
+      area.hidden = false; area.style.display = '';
+      area.value = opts.valor || '';
+    }else if(opts.valor === null || opts.valor === undefined){
+      inp.style.display = 'none';
+      area.hidden = true; area.style.display = 'none';
     }else{
       inp.style.display = '';
+      area.hidden = true; area.style.display = 'none';
       inp.value = opts.valor;
     }
     $('modal-dialogo').hidden = false;
-    if(opts.valor !== null && opts.valor !== undefined){
+    if(opts.textarea){
+      setTimeout(()=>{ area.focus(); }, 50);
+    }else if(opts.valor !== null && opts.valor !== undefined){
       setTimeout(()=>{ inp.focus(); inp.select(); }, 50);
     }
   });
 }
 function cerrarDialogo(ok){
   $('modal-dialogo').hidden = true;
-  const inp = $('dlg-input');
+  const inp = $('dlg-input'), area = $('dlg-textarea');
+  const conArea = area.style.display !== 'none';
   const conInput = inp.style.display !== 'none';
-  const r = ok ? (conInput ? inp.value : true) : null;
+  const r = ok ? (conArea ? area.value : (conInput ? inp.value : true)) : null;
   const fn = dlgRes; dlgRes = null;
   if(fn) fn(r);
 }
@@ -1369,6 +1397,19 @@ document.addEventListener('keydown', ev=>{
   if(ev.key === 'Escape') cerrarDialogo(false);
 });
 let toastTimer = null;
+/* limpia una URL pegada a mano: quita saltos de línea del copy-paste,
+   codifica espacios reales o "+" como %20 (en la ruta de un archivo "+" es
+   un carácter literal, NO un espacio — a diferencia de una query string —
+   así que si aparece casi siempre es un espacio mal codificado), y corrige
+   el caso típico de archive.org donde se pega la página del ítem
+   (/details/) en vez del archivo real (/download/) */
+function limpiarURLPegada(resp){
+  let limpio = resp.trim().replace(/[\r\n\t]+/g, '')
+    .replace(/\+/g, '%20')
+    .replace(/ /g, '%20');
+  limpio = limpio.replace(/^(https?:\/\/(?:www\.)?archive\.org\/)details\//i, '$1download/');
+  return limpio;
+}
 function avisar(msg){
   const t = $('toast');
   t.textContent = msg;
@@ -1451,6 +1492,34 @@ function ordenarPorNum(){
   pintarAlbumUI();
 }
 
+async function agregarVariasPistas(){
+  const bloque = await dialogo({
+    titulo: '➕ VARIAS PISTAS',
+    mensaje: 'Una pista por línea, formato:  Título | URL\n' +
+      'La URL es opcional (puedes dejarla vacía y ponerla después con ✎).',
+    valor: '', textarea: true});
+  if(bloque === null || !bloque.trim()) return;
+  const lineas = bloque.split('\n').map(l=>l.trim()).filter(Boolean);
+  let n = ALBUM.tracks.length;
+  lineas.forEach(linea=>{
+    const [tituloCrudo, urlCruda] = linea.split('|');
+    const titulo = (tituloCrudo||'').trim();
+    if(!titulo) return;
+    n++;
+    const pista = {num: n, titulo, duracion: null, videoId: null};
+    if(urlCruda && urlCruda.trim()){
+      const f = detectarFuente(limpiarURLPegada(urlCruda.trim()));
+      pista.videoId = f.videoId;
+      if(f.audio !== undefined) pista.audio = f.audio;
+      if(f.soundcloud !== undefined) pista.soundcloud = f.soundcloud;
+      if(f.fuente) pista.fuente = f.fuente;
+    }
+    ALBUM.tracks.push(pista);
+  });
+  regenerarOrden();
+  marcarSucio();
+  pintarAlbumUI();
+}
 async function agregarPista(){
   const titulo = await dialogo({
     titulo: '➕ NUEVA PISTA',
@@ -1496,13 +1565,27 @@ async function editarPortada(){
   if(resp === null) return;
   // limpiar saltos de línea del copy-paste y codificar espacios reales (en vez
   // de borrarlos, que rompe imágenes con espacios en el nombre de archivo)
-  ALBUM.portada = resp.trim().replace(/[\r\n\t]+/g, '').replace(/ /g, '%20') || null;
+  ALBUM.portada = limpiarURLPegada(resp) || null;
   hayCambios = true;
   pintarAlbumUI();
   const btn = $('btn-guardar');
   if(btn) btn.style.display = '';
 }
 
+/* detecta el tipo de fuente a partir de una URL/ID ya limpia: YouTube,
+   SoundCloud o audio directo (.mp3...). Reutilizada por editarPista() y por
+   el pegado masivo de pistas */
+function detectarFuente(limpio2){
+  if(/^https?:\/\/.+\.(mp3|m4a|ogg|aac|wav|flac)(\?.*)?$/i.test(limpio2)){
+    return {audio: limpio2, videoId: null, soundcloud: undefined, fuente: 'curador-audio'};
+  }
+  if(/soundcloud\.com\//i.test(limpio2)){
+    return {audio: undefined, videoId: null, soundcloud: limpio2.split('?')[0], fuente: 'curador-sc'};
+  }
+  const m = limpio2.match(/(?:v=|youtu\.be\/|shorts\/)?([\w-]{11})(?:\W|$)/);
+  const videoId = m ? m[1] : null;
+  return {audio: undefined, videoId, soundcloud: undefined, fuente: videoId ? 'curador' : undefined};
+}
 async function editarPista(i){
   const t = ALBUM.tracks[i];
   const actual = t.videoId || '';
@@ -1516,24 +1599,11 @@ async function editarPista(i){
   // limpiar solo saltos de línea/tabs del copy-paste, y codificar los espacios
   // reales del nombre de archivo en vez de borrarlos (archive.org y otros
   // hosts suelen tener mp3 con espacios en el nombre: "01- Cancion.mp3")
-  const limpio2 = resp.trim().replace(/[\r\n\t]+/g, '').replace(/ /g, '%20');
-  if(/^https?:\/\/.+\.(mp3|m4a|ogg|aac|wav|flac)(\?.*)?$/i.test(limpio2)){
-    t.audio = limpio2;
-    t.videoId = null;
-    delete t.soundcloud;
-    t.fuente = 'curador-audio';
-  } else if(/soundcloud\.com\//i.test(limpio2)){
-    t.soundcloud = limpio2.split('?')[0];
-    t.videoId = null;
-    delete t.audio;
-    t.fuente = 'curador-sc';
-  } else {
-    const m = limpio2.match(/(?:v=|youtu\.be\/|shorts\/)?([\w-]{11})(?:\W|$)/);
-    t.videoId = m ? m[1] : null;
-    delete t.audio;
-    delete t.soundcloud;
-    t.fuente = t.videoId ? 'curador' : undefined;
-  }
+  const limpio2 = limpiarURLPegada(resp);
+  const f = detectarFuente(limpio2);
+  t.audio = f.audio; t.videoId = f.videoId; t.soundcloud = f.soundcloud; t.fuente = f.fuente;
+  if(t.audio === undefined) delete t.audio;
+  if(t.soundcloud === undefined) delete t.soundcloud;
   hayCambios = true;
   regenerarOrden();
   pintarAlbumUI();
@@ -2384,6 +2454,194 @@ async function cargarRetrovisor(){
   }
 }
 
+/* ====================== NOVEDADES (últimas descargas de Soulseek) ====================== */
+let NOVEDADES = [], novedadesCargadas = false;
+
+/* filtra carpetas que casi seguro NO son un álbum de música */
+function esMusicaProbable(nombre){
+  const n = (nombre || '').trim();
+  const excluir = [
+    /\.(zip|rar|7z|exe|dmg|epub|pdf)$/i,
+    /\bcrack\b/i, /audiolibro/i, /fanzine/i, /epubcat/i,
+    /^(music|videos|artwork|sideshow|a ecouter)$/i,
+    /^web\s?znp$/i,
+    /^zz\./i,                    // carpetas de trabajo tipo "zz. shorts"
+    /^cd[\s.]?\d+\b/i,           // "CD1", "CD 1 - ...", "CD.02 - ..." (fragmento de disco)
+    /^vol\.?\s*\d+$/i            // "Vol. 04" sin más contexto
+  ];
+  return !excluir.some(re => re.test(n));
+}
+/* extrae artista/álbum/año de un nombre de carpeta, con lo que se pueda */
+function extraerMetadatosNovedad(nombre){
+  let n = (nombre || '').trim();
+  let año = null;
+  const mAño = n.match(/[\(\[](\d{4})[\)\]]/);
+  if(mAño){ año = mAño[1]; n = n.replace(mAño[0], '').trim(); }
+  n = n.replace(/\s{2,}/g, ' ').replace(/[-–]\s*$/, '').trim();
+  let artista = '', album = n;
+  const m = n.match(/^(.+?)\s+[-–]\s+(.+)$/) || n.match(/^(.+?),\s+(.+)$/);
+  if(m){ artista = m[1].trim(); album = m[2].trim(); }
+  return {artista, album, año, revisar: !artista || !año};
+}
+/* parsea el pegado "YYYY-MM-DD<TAB>nombre" (una línea por carpeta) */
+function parsearListadoNovedades(texto){
+  return texto.split('\n').map(l => l.trim()).filter(Boolean).map(linea => {
+    const partes = linea.split('\t');
+    const fecha = partes.length > 1 ? partes[0].trim() : null;
+    const carpeta = (partes.length > 1 ? partes.slice(1).join('\t') : linea).trim();
+    return {carpeta, fecha};
+  }).filter(x => x.carpeta);
+}
+
+async function initNovedades(){
+  if(MODO_EDITAR){
+    $('btn-pegar-novedades').style.display = '';
+    $('btn-pegar-novedades').onclick = pegarListadoNovedades;
+  }
+  if(novedadesCargadas){ pintarNovedades(); return; }
+  novedadesCargadas = true;
+  const st = $('novedades-status');
+  st.textContent = 'CARGANDO...';
+  try{
+    const r = await fetch('novedades.json?t=' + Date.now());
+    NOVEDADES = r.ok ? await r.json() : [];
+  }catch(_){ NOVEDADES = []; }
+  st.textContent = NOVEDADES.length ? `${NOVEDADES.length} DESCARGAS` : '';
+  pintarNovedades();
+}
+function pintarNovedades(){
+  const q = normalizar($('buscador-novedades').value || '');
+  const cont = $('novedades-lista');
+  cont.innerHTML = '';
+  const lista = [...NOVEDADES]
+    .filter(n => !q || normalizar(n.carpeta + ' ' + (n.artista||'') + ' ' + (n.album||'')).includes(q))
+    .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  if(!lista.length){
+    cont.innerHTML = '<div class="lf-vacio">Sin novedades todavía' +
+      (MODO_EDITAR ? ' · usa ➕ PEGAR LISTADO' : '') + '</div>';
+    return;
+  }
+  lista.forEach(n => {
+    const d = document.createElement('div');
+    d.className = 'lf-track';
+    d.innerHTML = `<span class="lf-num" style="width:80px">${n.fecha || ''}</span>
+      <div class="lf-txt"><b>${n.album || n.carpeta}</b>
+      <span>${n.artista || ''}${n.año ? ' · ' + n.año : ''}</span></div>
+      <i>▶ escuchar</i>`;
+    d.onclick = () => abrirListaLF(
+      n.artista ? `${n.artista} — ${n.album}` : n.carpeta,
+      [pistaLF(n.artista || '', n.album || n.carpeta, 1)], 0);
+    cont.appendChild(d);
+  });
+}
+
+/* ---------- modo curador: pegar listado, revisar y guardar ---------- */
+let novedadesRevision = [];
+async function pegarListadoNovedades(){
+  const bloque = await dialogo({
+    titulo: '➕ PEGAR LISTADO DE DESCARGAS',
+    mensaje: 'Pega la salida de:\n' +
+      "ls -1t | while read f; do echo \"$(stat -f '%Sm' -t '%Y-%m-%d' \"$f\")\\t$f\"; done\n" +
+      '(una carpeta por línea, fecha y nombre separados por tabulador)',
+    valor: '', textarea: true});
+  if(bloque === null || !bloque.trim()) return;
+  const parseadas = parsearListadoNovedades(bloque);
+  const yaGuardadas = new Set(NOVEDADES.map(n => n.carpeta));
+  novedadesRevision = parseadas
+    .filter(p => !yaGuardadas.has(p.carpeta))
+    .map(p => ({...p, ...extraerMetadatosNovedad(p.carpeta), incluir: esMusicaProbable(p.carpeta)}));
+  pintarRevisionNovedades();
+}
+function pintarRevisionNovedades(){
+  const cont = $('novedades-revision');
+  if(!novedadesRevision.length){ cont.style.display = 'none'; cont.innerHTML=''; return; }
+  cont.style.display = '';
+  const nIncluidas = novedadesRevision.filter(n => n.incluir).length;
+  cont.innerHTML = `<div class="lf-intro" style="margin-bottom:10px">
+      ${novedadesRevision.length} carpetas nuevas · ${nIncluidas} marcadas como música.
+      Desmarca lo que no sea un álbum, corrige artista/álbum si hace falta, y guarda.</div>
+    <div id="novedades-revision-lista"></div>
+    <div class="lf-fila-ctrl" style="margin-top:12px">
+      <button class="btn-azar" onclick="guardarNovedades()">💾 GUARDAR NOVEDADES</button>
+      <button class="btn-azar" onclick="cancelarRevisionNovedades()">CANCELAR</button>
+    </div>`;
+  const listaEl = $('novedades-revision-lista');
+  novedadesRevision.forEach((n, i) => {
+    const fila = document.createElement('div');
+    fila.className = 'lf-track';
+    fila.style.cursor = 'default';
+    fila.innerHTML = `
+      <input type="checkbox" ${n.incluir ? 'checked' : ''} style="flex:none">
+      <span class="lf-num" style="width:80px">${n.fecha || ''}</span>
+      <div class="lf-txt">
+        <input class="dlg-mini dlg-artista" placeholder="artista" value="${(n.artista||'').replace(/"/g,'&quot;')}"
+          style="width:38%;background:#101216;border:1px solid var(--linea);border-radius:4px;color:var(--texto);
+          padding:4px 7px;font-size:11px;font-family:inherit">
+        <input class="dlg-mini dlg-album" placeholder="álbum" value="${(n.album||n.carpeta).replace(/"/g,'&quot;')}"
+          style="width:38%;background:#101216;border:1px solid var(--linea);border-radius:4px;color:var(--texto);
+          padding:4px 7px;font-size:11px;font-family:inherit;margin-left:6px">
+        <input class="dlg-mini dlg-anio" placeholder="año" value="${n.año||''}"
+          style="width:60px;background:#101216;border:1px solid var(--linea);border-radius:4px;color:var(--texto);
+          padding:4px 7px;font-size:11px;font-family:inherit;margin-left:6px">
+      </div>
+      <i>${n.revisar ? 'REVISAR' : ''}</i>`;
+    fila.querySelector('[type=checkbox]').onchange = ev => novedadesRevision[i].incluir = ev.target.checked;
+    fila.querySelector('.dlg-artista').oninput = ev => novedadesRevision[i].artista = ev.target.value;
+    fila.querySelector('.dlg-album').oninput = ev => novedadesRevision[i].album = ev.target.value;
+    fila.querySelector('.dlg-anio').oninput = ev => novedadesRevision[i].año = ev.target.value;
+    listaEl.appendChild(fila);
+  });
+}
+function cancelarRevisionNovedades(){
+  novedadesRevision = [];
+  $('novedades-revision').style.display = 'none';
+  $('novedades-revision').innerHTML = '';
+}
+async function guardarNovedades(){
+  const token = await pedirToken();
+  if(!token) return;
+  const nuevas = novedadesRevision.filter(n => n.incluir)
+    .map(({carpeta, fecha, artista, album, año}) => ({carpeta, fecha, artista, album, año}));
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${BASE}novedades.json`;
+  const cab = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'};
+  let ok = false, ultimoError = '';
+  for(let intento = 1; intento <= 3 && !ok; intento++){
+    try{
+      let lista = [], sha;
+      const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
+      if(r1.ok){
+        const d = await r1.json();
+        sha = d.sha;
+        try{ lista = JSON.parse(utoaDecode(d.content)); }catch(_){ lista = []; }
+      } else if(r1.status !== 404){
+        throw new Error('leyendo novedades: ' + r1.status);
+      }
+      const existentes = new Set(lista.map(x => x.carpeta));
+      nuevas.forEach(n => { if(!existentes.has(n.carpeta)) lista.push(n); });
+      const cuerpo = {message: `curador: +${nuevas.length} novedades`,
+        content: utoa(JSON.stringify(lista)), branch: 'main'};
+      if(sha) cuerpo.sha = sha;
+      const r2 = await fetch(api, {method: 'PUT', headers: cab, body: JSON.stringify(cuerpo)});
+      if(r2.status === 409){ ultimoError = '409 (conflicto)'; await new Promise(res=>setTimeout(res,2500)); continue; }
+      if(!r2.ok) throw new Error('guardando: ' + r2.status);
+      NOVEDADES = lista;
+      ok = true;
+    }catch(e){
+      ultimoError = e.message;
+      if(String(e).includes('401')){ localStorage.removeItem('gh_token'); break; }
+      await new Promise(res => setTimeout(res, 2000));
+    }
+  }
+  if(ok){
+    cancelarRevisionNovedades();
+    $('novedades-status').textContent = `${NOVEDADES.length} DESCARGAS`;
+    pintarNovedades();
+    avisar('✓ Guardado en GitHub · el sitio se actualiza en 1-2 min');
+  }else{
+    avisar('⚠ Error tras 3 intentos: ' + ultimoError);
+  }
+}
+
 /* ====================== EFECTOS DJ (Web Audio, sintetizados) ====================== */
 const FX = {ctx:null, master:null};
 function fxCtx(){
@@ -2559,6 +2817,7 @@ document.addEventListener('keydown', ev=>{
     filtroGeneroVin = ev.target.value; pintarVinilos();
   });
   $('sel-orden-vinilos').addEventListener('change', pintarVinilos);
+  $('buscador-novedades').addEventListener('input', pintarNovedades);
   $('kp-periodo').addEventListener('change', cargarKinoPlayer);
   $('tm-fecha').max = new Date().toISOString().slice(0, 10);
   if(MODO_EDITAR){
@@ -2577,6 +2836,9 @@ document.addEventListener('keydown', ev=>{
     <h4 id="dlg-titulo"></h4>
     <p id="dlg-msg" style="font-size:12px;color:var(--texto);white-space:pre-line;margin:4px 0 2px;line-height:1.5"></p>
     <input id="dlg-input" type="text" autocomplete="off" style="margin-top:8px">
+    <textarea id="dlg-textarea" hidden rows="10" style="margin-top:8px;width:100%;background:#101216;
+      border:1px solid var(--linea);border-radius:6px;color:var(--texto);padding:9px 12px;
+      font-size:12px;font-family:inherit;resize:vertical"></textarea>
     <div class="ficha-botones">
       <button class="ficha-no" onclick="cerrarDialogo(false)">CANCELAR</button>
       <button class="ficha-ok" onclick="cerrarDialogo(true)">APLICAR</button>
