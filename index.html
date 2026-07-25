@@ -1412,6 +1412,19 @@ function limpiarURLPegada(resp){
   limpio = limpio.replace(/^(https?:\/\/(?:www\.)?archive\.org\/)details\//i, '$1download/');
   return limpio;
 }
+/* decodifica el JSON que devuelve la API de GitHub para un archivo existente.
+   CRÍTICO: si el contenido no viene o no se puede parsear, esto DEBE lanzar
+   un error y abortar el guardado — nunca "seguir adelante" con una lista
+   vacía, porque eso sobrescribiría el archivo entero (todo el catálogo,
+   todos los overrides, etc.) con solo lo nuevo que se estaba añadiendo. */
+function decodificarJSONGitHub(d, nombreArchivo){
+  if(!d || d.content === undefined || d.content === null){
+    throw new Error(`${nombreArchivo}: la API de GitHub no devolvió el contenido del ` +
+      `archivo (puede ser demasiado grande para leerse así, o un fallo de red). ` +
+      `No se sobrescribe nada por seguridad.`);
+  }
+  return JSON.parse(utoaDecode(d.content));
+}
 function avisar(msg){
   const t = $('toast');
   t.textContent = msg;
@@ -1691,7 +1704,7 @@ async function registrarEnIndice(cab){
       if(!r1.ok) throw new Error('leyendo indice: ' + r1.status);
       const d = await r1.json();
       let lista;
-      try{ lista = JSON.parse(utoaDecode(d.content)); }catch(_){ lista = []; }
+      lista = decodificarJSONGitHub(d, 'indice.json');
       if(!lista.some(e=>e.id === entrada.id)) lista.push(entrada);
       const r2 = await fetch(api, {
         method: 'PUT', headers: cab,
@@ -1747,7 +1760,7 @@ async function guardarVinilo(){
       if(r1.ok){
         const d = await r1.json();
         sha = d.sha;
-        try{ overrides = JSON.parse(utoaDecode(d.content)); }catch(_){ overrides = {}; }
+        overrides = decodificarJSONGitHub(d, 'vinilos_overrides.json');
       } else if(r1.status !== 404){
         throw new Error('leyendo overrides: ' + r1.status);
       }
@@ -2723,14 +2736,18 @@ async function eliminarNovedad(n){
   for(let intento = 1; intento <= 3 && !ok; intento++){
     try{
       const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
-      if(!r1.ok) throw new Error('leyendo novedades: ' + r1.status);
-      const d = await r1.json();
-      let lista = [];
-      try{ lista = JSON.parse(utoaDecode(d.content)); }catch(_){ lista = []; }
+      let lista = [], sha;
+      if(r1.ok){
+        const d = await r1.json();
+        sha = d.sha;
+        lista = decodificarJSONGitHub(d, 'novedades.json');
+      } else if(r1.status !== 404){
+        throw new Error('leyendo novedades: ' + r1.status);
+      }
       lista = lista.filter(x => x.carpeta !== n.carpeta);
       const r2 = await fetch(api, {method: 'PUT', headers: cab, body: JSON.stringify({
         message: `curador: quitar novedad — ${n.carpeta}`,
-        content: utoa(JSON.stringify(lista)), sha: d.sha, branch: 'main'
+        content: utoa(JSON.stringify(lista)), sha, branch: 'main'
       })});
       if(r2.status === 409){ ultimoError = '409 (conflicto)'; await new Promise(r=>setTimeout(r,2500)); continue; }
       if(!r2.ok) throw new Error('guardando: ' + r2.status);
@@ -2764,7 +2781,7 @@ async function guardarNovedades(){
       if(r1.ok){
         const d = await r1.json();
         sha = d.sha;
-        try{ lista = JSON.parse(utoaDecode(d.content)); }catch(_){ lista = []; }
+        lista = decodificarJSONGitHub(d, 'novedades.json');
       } else if(r1.status !== 404){
         throw new Error('leyendo novedades: ' + r1.status);
       }
