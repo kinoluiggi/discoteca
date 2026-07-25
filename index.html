@@ -56,6 +56,33 @@ header .sub{font-size:11px;letter-spacing:.16em;color:var(--texto-tenue)}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lf-item span{font-size:11px;color:var(--texto-tenue)}
 .lf-item i{font-size:10px;color:var(--ambar);font-style:normal;letter-spacing:.06em}
+/* sub-navegación y módulos de LAST.FM */
+.lf-nav{display:flex;gap:6px;flex-wrap:wrap;padding:18px 26px 0}
+.lf-panel{display:none;padding:20px 26px 60px}
+.lf-panel.activo{display:block}
+.lf-intro{font-size:11px;color:var(--texto-tenue);line-height:1.6;max-width:640px;margin-bottom:18px}
+.lf-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:22px}
+.lf-stat{background:var(--panel);border:1px solid var(--linea);border-radius:8px;padding:12px 14px}
+.lf-stat b{display:block;font-size:20px;color:var(--ambar);font-weight:700}
+.lf-stat span{font-size:10px;color:var(--texto-tenue);letter-spacing:.08em;text-transform:uppercase}
+.lf-track{display:flex;align-items:center;gap:11px;padding:8px 4px;border-bottom:1px solid rgba(39,44,52,.5);
+  cursor:pointer;border-radius:4px}
+.lf-track:hover{background:var(--panel-luz)}
+.lf-track.activa{background:var(--panel-luz);border-left:2px solid var(--ambar)}
+.lf-track.muda{opacity:.45;cursor:default}
+.lf-track img,.lf-track .lf-ph{width:38px;height:38px;border-radius:3px;object-fit:cover;background:#14171c;flex:none}
+.lf-track .lf-num{width:20px;text-align:right;font-size:10px;color:var(--texto-tenue);flex:none}
+.lf-track div.lf-txt{flex:1;min-width:0}
+.lf-track b{display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-track span{font-size:11px;color:var(--texto-tenue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-track i{font-size:10px;color:var(--ambar);font-style:normal;letter-spacing:.04em;flex:none}
+.lf-cargando,.lf-vacio{font-size:12px;color:var(--texto-tenue);padding:20px 4px}
+.lf-fila-ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.lf-fila-ctrl input[type=date]{background:#101216;border:1px solid var(--linea);border-radius:6px;
+  color:var(--texto);padding:8px 10px;font-size:12px;font-family:inherit}
+.lf-fila-ctrl input[type=date]:focus{outline:1px solid var(--ambar)}
+.lf-prompt{white-space:pre-wrap;font-size:11px;line-height:1.6;color:var(--texto-tenue);
+  background:#101216;border:1px solid var(--linea);border-radius:8px;padding:14px;max-height:340px;overflow:auto}
 /* modal de edición de ficha (modo curador) */
 #modal-ficha,#modal-dialogo{position:fixed;inset:0;background:rgba(0,0,0,.7);
   display:flex;align-items:center;justify-content:center;z-index:100}
@@ -341,6 +368,19 @@ input[type=range]::-moz-range-thumb{
   <div class="controles">
     <input class="buscador" id="buscador-vinilos" type="search"
            placeholder="Buscar en los vinilos..." autocomplete="off">
+    <div class="chips" id="chips-decadas-vinilos"></div>
+    <select class="selector" id="sel-genero-vinilos" style="display:none">
+      <option value="">GÉNERO: TODOS</option>
+    </select>
+    <select class="selector" id="sel-orden-vinilos">
+      <option value="artist">ORDENAR: ARTISTA</option>
+      <option value="year">ORDENAR: AÑO</option>
+      <option value="added">ORDENAR: AÑADIDO</option>
+      <option value="rating">ORDENAR: VALORACIÓN</option>
+      <option value="title">ORDENAR: TÍTULO</option>
+    </select>
+    <button class="chip activo" id="vin-modo-coleccion" onclick="vinModo('coleccion')">COLECCIÓN</button>
+    <button class="chip" id="vin-modo-wantlist" onclick="vinModo('wantlist')">WANTLIST</button>
     <div class="contador" id="vinilos-status"></div>
   </div>
   <div class="grid" id="grid-vinilos"></div>
@@ -348,10 +388,83 @@ input[type=range]::-moz-range-thumb{
 
 <!-- ================= VISTA LAST.FM ================= -->
 <div id="vista-lastfm" style="display:none">
-  <div class="lf-cols">
-    <div><h3 class="lf-h">ESCUCHADO RECIENTEMENTE</h3><div id="lf-recientes"></div></div>
-    <div><h3 class="lf-h">TOP ÁLBUMES · ÚLTIMO MES</h3><div id="lf-top"></div></div>
-    <div><h3 class="lf-h">FAVORITAS ❤</h3><div id="lf-loved"></div></div>
+  <nav class="lf-nav" id="lf-nav">
+    <button class="chip activo" data-lf="dashboard" onclick="mostrarLF('dashboard')">DASHBOARD</button>
+    <button class="chip" data-lf="kinoplayer" onclick="mostrarLF('kinoplayer')">KINOPLAYER</button>
+    <button class="chip" data-lf="tiempo" onclick="mostrarLF('tiempo')">MÁQUINA DEL TIEMPO</button>
+    <button class="chip" data-lf="ia" onclick="mostrarLF('ia')">PLAYLIST IA</button>
+    <button class="chip" data-lf="isla" onclick="mostrarLF('isla')">ISLA DESIERTA</button>
+    <button class="chip" data-lf="retro" onclick="mostrarLF('retro')">RETROVISOR</button>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <div class="lf-panel activo" id="lf-p-dashboard">
+    <div class="lf-stats" id="lf-stats"></div>
+    <div class="lf-cols">
+      <div><h3 class="lf-h">ESCUCHADO RECIENTEMENTE</h3><div id="lf-recientes"></div></div>
+      <div><h3 class="lf-h">TOP ÁLBUMES · ÚLTIMO MES</h3><div id="lf-top"></div></div>
+      <div><h3 class="lf-h">FAVORITAS ❤</h3><div id="lf-loved"></div></div>
+    </div>
+  </div>
+
+  <!-- KINOPLAYER -->
+  <div class="lf-panel" id="lf-p-kinoplayer">
+    <p class="lf-intro">Tus canciones más escuchadas, reproducibles vía YouTube.</p>
+    <div class="lf-fila-ctrl">
+      <select class="selector" id="kp-periodo">
+        <option value="7day">7 DÍAS</option>
+        <option value="1month">1 MES</option>
+        <option value="3month">3 MESES</option>
+        <option value="6month">6 MESES</option>
+        <option value="12month">12 MESES</option>
+        <option value="overall" selected>SIEMPRE</option>
+      </select>
+      <button class="chip activo" id="kp-modo-top" onclick="kpModo('top')">TOP TRACKS</button>
+      <button class="chip" id="kp-modo-loved" onclick="kpModo('loved')">FAVORITAS ❤</button>
+    </div>
+    <div id="kp-lista"><div class="lf-cargando">Cargando…</div></div>
+  </div>
+
+  <!-- MÁQUINA DEL TIEMPO -->
+  <div class="lf-panel" id="lf-p-tiempo">
+    <p class="lf-intro">¿Qué escuchabas cualquier día desde que empezaste a scrobblear?</p>
+    <div class="lf-fila-ctrl">
+      <input type="date" id="tm-fecha">
+      <button class="btn-azar" onclick="viajarEnElTiempo()">◷ VIAJAR</button>
+    </div>
+    <div class="lf-stats" id="tm-stats" style="display:none"></div>
+    <div id="tm-lista"></div>
+  </div>
+
+  <!-- PLAYLIST IA -->
+  <div class="lf-panel" id="lf-p-ia">
+    <p class="lf-intro">Genera un prompt con tu historial real para pedirle a Claude una playlist
+      narrativa de 12 canciones. Cópialo y pégalo en <b>claude.ai</b> — así no hace falta pagar
+      una API para esto.</p>
+    <div class="lf-fila-ctrl">
+      <select class="selector" id="ia-periodo">
+        <option value="1month">ÚLTIMO MES</option>
+        <option value="3month">ÚLTIMOS 3 MESES</option>
+        <option value="12month">ÚLTIMO AÑO</option>
+        <option value="overall" selected>SIEMPRE</option>
+      </select>
+      <button class="btn-azar" onclick="generarPromptIA()">✦ GENERAR PROMPT</button>
+      <button class="btn-azar" id="ia-copiar" style="display:none" onclick="copiarPromptIA()">📋 COPIAR</button>
+    </div>
+    <div id="ia-prompt"></div>
+  </div>
+
+  <!-- ISLA DESIERTA -->
+  <div class="lf-panel" id="lf-p-isla">
+    <p class="lf-intro">Tu núcleo duro: canciones que más has reproducido Y que además marcaste
+      como favoritas ❤.</p>
+    <div id="isla-lista"><div class="lf-cargando">Cargando…</div></div>
+  </div>
+
+  <!-- RETROVISOR -->
+  <div class="lf-panel" id="lf-p-retro">
+    <p class="lf-intro" id="retro-intro">Hoy, pero hace años: qué sonaba este mismo día en ediciones anteriores.</p>
+    <div id="retro-lista"><div class="lf-cargando">Cargando…</div></div>
   </div>
 </div>
 
@@ -444,6 +557,10 @@ const CONFIG = {
   DISCOGS_TOKEN: 'mpkVHVRdThOWTdPRKuBCCqlFQQTBofjPolbwTljO',
   LASTFM_USER: 'kinoluiggi',
   LASTFM_KEY: '6b8d7a206bd7449cedb73dc6182d028e',
+  // clave de YouTube Data API v3, para resolver videoId reales en los módulos
+  // de LAST.FM (cuota gratuita: ~100 búsquedas/día). Restringe esta clave a
+  // tu dominio en la consola de Google Cloud si quieres blindarla más.
+  YOUTUBE_API_KEY: 'AIzaSyBhlbmPq4k5sAuCSXP3SnRaUi546UVdS54',
   // URL de tu Cloudflare Worker de scrobbling (vacío = scrobbling apagado)
   SCROBBLE_WORKER: '',
   // repo de GitHub para el modo curador (?editar en la URL)
@@ -636,8 +753,9 @@ let ALBUM=null, pista=0, sonando=false, reloj=null;
 let shuffle=false, repetir=false, orden=[], posOrden=0;
 let RADIO=false, radioCandidatos=[];
 
-/* pista reproducible: tiene video de YouTube O audio directo */
-const reproducible = t => !!(t && (t.videoId || t.audio || t.soundcloud));
+/* pista reproducible: tiene video de YouTube, audio directo, O es una pista
+   de Last.fm aún sin resolver contra YouTube (se resuelve al llegar a ella) */
+const reproducible = t => !!(t && (t.videoId || t.audio || t.soundcloud || (t._lf && !t._sinVideo)));
 const motorDe = t => t && (t.audio ? 'audio' : (t.soundcloud ? 'sc' : (t.videoId ? 'yt' : null)));
 
 /* ---------- motor SoundCloud (Widget API) ---------- */
@@ -684,7 +802,7 @@ function cargarSC(url, autoplay){
 }
 function mostrarMotor(m){
   const ytEl = $('yt-player'), scEl = $('sc-player');
-  if(ytEl) ytEl.style.display = (m==='sc') ? 'none' : '';
+  if(ytEl) ytEl.style.display = (m==='yt') ? '' : 'none';
   if(scEl) scEl.style.display = (m==='sc') ? '' : 'none';
 }
 
@@ -829,10 +947,11 @@ function pintarAlbumUI(){
       borra.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:11px;padding:0 2px';
       borra.onclick=ev=>{ ev.stopPropagation(); borrarPista(i); };
       div.appendChild(borra);
-      const titulo = div.querySelector('.titulo');
-      titulo.style.cssText += ';cursor:text;border-bottom:1px dashed var(--texto-tenue)';
-      titulo.title = 'Clic para renombrar';
-      titulo.onclick = ev=>{ ev.stopPropagation(); renombrarPista(i); };
+      const renom=document.createElement('button');
+      renom.textContent='🏷'; renom.title='Renombrar esta pista';
+      renom.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:11px;padding:0 2px';
+      renom.onclick=ev=>{ ev.stopPropagation(); renombrarPista(i); };
+      div.appendChild(renom);
     }
     if(MODO_EDITAR && (ALBUM._ruta || ALBUM._vinilo)){
       const busca=document.createElement('a');
@@ -989,6 +1108,11 @@ function cargar(i, reproducir=false){
       el.classList.toggle('activa', j===i));
   }
   if(!t){ $('t-actual').textContent='0:00'; $('t-total').textContent='0:00'; ponerSeek(0,1); return; }
+  if(t._lf && !t.videoId && !t._sinVideo){
+    $('t-actual').textContent='0:00'; $('t-total').textContent='···'; ponerSeek(0,1);
+    resolverPistaLastfm(i, reproducir);
+    return;
+  }
   $('t-actual').textContent='0:00';
   $('t-total').textContent=fmt(t.duracion);
   ponerSeek(0, t.duracion||1);
@@ -1411,6 +1535,7 @@ async function editarPista(i){
     t.fuente = t.videoId ? 'curador' : undefined;
   }
   hayCambios = true;
+  regenerarOrden();
   pintarAlbumUI();
   const btn = $('btn-guardar');
   if(btn) btn.style.display = '';
@@ -1688,11 +1813,14 @@ async function initVinilos(){
       if(!r.ok) throw new Error('Discogs '+r.status);
       const d=await r.json();
       total=d.pagination.pages;
-      d.releases.forEach(rel=>VINILOS.push(rel.basic_information));
+      d.releases.forEach(rel=>VINILOS.push(
+        {...rel.basic_information, date_added: rel.date_added, rating: rel.rating||0}));
       st.textContent=`CARGANDO... ${VINILOS.length}/${d.pagination.items}`;
       page++;
     }
     st.textContent=`${VINILOS.length} VINILOS`;
+    pintarChipsVinilos();
+    pintarSelectorGeneroVinilos();
     pintarVinilos();
   }catch(e){
     st.textContent='ERROR CARGANDO DISCOGS';
@@ -1700,14 +1828,102 @@ async function initVinilos(){
   }
 }
 
+let WANTLIST=[], wantlistCargado=false;
+async function cargarWantlist(){
+  if(wantlistCargado) return;
+  wantlistCargado=true;
+  const st=$('vinilos-status');
+  st.textContent='CARGANDO WANTLIST...';
+  try{
+    let page=1, total=1;
+    while(page<=total && page<=15){
+      const r=await fetch(
+        `https://api.discogs.com/users/${CONFIG.DISCOGS_USER}` +
+        `/wants?token=${CONFIG.DISCOGS_TOKEN}&per_page=100&page=${page}`);
+      if(!r.ok) throw new Error('Discogs '+r.status);
+      const d=await r.json();
+      total=d.pagination.pages;
+      d.wants.forEach(w=>WANTLIST.push(
+        {...w.basic_information, date_added: w.date_added, rating: 0}));
+      st.textContent=`CARGANDO... ${WANTLIST.length}/${d.pagination.items}`;
+      page++;
+    }
+    st.textContent=`${WANTLIST.length} EN LA WANTLIST`;
+    pintarChipsVinilos();
+    pintarSelectorGeneroVinilos();
+    pintarVinilos();
+  }catch(e){
+    st.textContent='ERROR CARGANDO LA WANTLIST';
+    wantlistCargado=false;
+  }
+}
+
+/* colección vs wantlist, filtros y orden (al estilo Discogs) */
+let modoVinilos='coleccion', filtroDecadaVin=null, filtroGeneroVin='';
+function listaVinilosActual(){ return modoVinilos==='coleccion' ? VINILOS : WANTLIST; }
+function vinModo(m){
+  modoVinilos=m;
+  $('vin-modo-coleccion').classList.toggle('activo', m==='coleccion');
+  $('vin-modo-wantlist').classList.toggle('activo', m==='wantlist');
+  filtroDecadaVin=null; filtroGeneroVin=''; $('sel-genero-vinilos').value='';
+  if(m==='wantlist') cargarWantlist();
+  else $('vinilos-status').textContent = `${VINILOS.length} VINILOS`;
+  pintarChipsVinilos();
+  pintarSelectorGeneroVinilos();
+  pintarVinilos();
+}
+function pintarChipsVinilos(){
+  const decs=[...new Set(listaVinilosActual().map(b=>decadaDe(b.year)).filter(Boolean))]
+    .sort((a,b)=>a-b);
+  const cont=$('chips-decadas-vinilos');
+  cont.innerHTML='';
+  const todos=document.createElement('button');
+  todos.className='chip'+(filtroDecadaVin?'':' activo'); todos.textContent='TODAS';
+  todos.onclick=()=>{ filtroDecadaVin=null; pintarChipsVinilos(); pintarVinilos(); };
+  cont.appendChild(todos);
+  decs.forEach(d=>{
+    const c=document.createElement('button');
+    c.className='chip'+(filtroDecadaVin===d?' activo':''); c.textContent=d+'s';
+    c.onclick=()=>{ filtroDecadaVin=(filtroDecadaVin===d?null:d); pintarChipsVinilos(); pintarVinilos(); };
+    cont.appendChild(c);
+  });
+}
+function pintarSelectorGeneroVinilos(){
+  const cuenta={};
+  listaVinilosActual().forEach(b=>(b.genres||[]).forEach(g=>cuenta[g]=(cuenta[g]||0)+1));
+  const sel=$('sel-genero-vinilos');
+  sel.innerHTML='<option value="">GÉNERO: TODOS</option>';
+  Object.keys(cuenta).sort((a,b)=>cuenta[b]-cuenta[a]).forEach(g=>{
+    const o=document.createElement('option');
+    o.value=g; o.textContent=`${g} (${cuenta[g]})`;
+    sel.appendChild(o);
+  });
+  sel.style.display = Object.keys(cuenta).length ? '' : 'none';
+}
+function ordenarVinilos(lista, criterio){
+  const arr=[...lista];
+  const nombreDe = b => ((b.artists&&b.artists[0]?b.artists[0].name:'')||'').replace(/\s*\(\d+\)$/,'');
+  if(criterio==='year') arr.sort((a,b)=>(a.year||0)-(b.year||0));
+  else if(criterio==='added') arr.sort((a,b)=>new Date(b.date_added||0)-new Date(a.date_added||0));
+  else if(criterio==='rating') arr.sort((a,b)=>(b.rating||0)-(a.rating||0));
+  else if(criterio==='title') arr.sort((a,b)=>(a.title||'').localeCompare(b.title||''));
+  else arr.sort((a,b)=>nombreDe(a).localeCompare(nombreDe(b)));
+  return arr;
+}
+
 function pintarVinilos(){
   const q=normalizar($('buscador-vinilos').value||'');
   const cont=$('grid-vinilos');
   cont.innerHTML='';
-  VINILOS.filter(b=>{
+  let lista=listaVinilosActual().filter(b=>{
     const artista=(b.artists&&b.artists[0]?b.artists[0].name:'');
-    return !q || normalizar(artista+' '+b.title).includes(q);
-  }).forEach(b=>{
+    if(q && !normalizar(artista+' '+b.title).includes(q)) return false;
+    if(filtroDecadaVin && decadaDe(b.year)!==filtroDecadaVin) return false;
+    if(filtroGeneroVin && !(b.genres||[]).includes(filtroGeneroVin)) return false;
+    return true;
+  });
+  lista = ordenarVinilos(lista, $('sel-orden-vinilos').value);
+  lista.forEach(b=>{
     const artista=((b.artists&&b.artists[0]?b.artists[0].name:'')||'')
       .replace(/\s*\(\d+\)$/,'');
     const div=document.createElement('div');
@@ -1773,51 +1989,399 @@ async function abrirVinilo(id){
 }
 
 /* ====================== LAST.FM ====================== */
-let lastfmCargado=false;
+/* ====================== LAST.FM: 6 módulos ====================== */
+async function lfm(metodo, extra){
+  const qs = `method=${metodo}&user=${CONFIG.LASTFM_USER}&api_key=${CONFIG.LASTFM_KEY}` +
+             `&format=json${extra||''}`;
+  const r = await fetch(`https://ws.audioscrobbler.com/2.0/?${qs}`);
+  return r.json();
+}
+function imgLF(obj){
+  const arr = obj && obj.image;
+  if(!Array.isArray(arr) || !arr.length) return null;
+  const grande = arr[arr.length-1];
+  const url = grande && grande['#text'];
+  // last.fm devuelve un cuadro gris genérico cuando no hay portada real
+  return (url && !url.includes('2a96cbd8b46e442fc41c2b86b821562f')) ? url : null;
+}
+function nombreArtista(o){
+  if(!o || !o.artist) return '';
+  if(typeof o.artist === 'string') return o.artist;
+  return o.artist.name || o.artist['#text'] || '';
+}
 
-async function initLastfm(){
-  if(lastfmCargado) return;
-  lastfmCargado=true;
-  const llamar=(m,extra)=>fetch(
-    `https://ws.audioscrobbler.com/2.0/?method=${m}` +
-    `&user=${CONFIG.LASTFM_USER}&api_key=${CONFIG.LASTFM_KEY}` +
-    `&format=json${extra||''}`).then(r=>r.json());
+/* ---------- resolución perezosa contra YouTube, con caché local ---------- */
+let avisadoCuotaYT = false;
+function leerCacheYT(){
+  try{ return JSON.parse(localStorage.getItem('yt_cache_lf') || '{}'); }catch(_){ return {}; }
+}
+function guardarCacheYT(c){
+  try{ localStorage.setItem('yt_cache_lf', JSON.stringify(c)); }catch(_){}
+}
+async function buscarEnYouTube(artista, cancion){
+  const clave = (artista + '::' + cancion).toLowerCase().trim();
+  const c = leerCacheYT();
+  if(Object.prototype.hasOwnProperty.call(c, clave)) return c[clave];
   try{
-    const [rec, top, loved] = await Promise.all([
-      llamar('user.getrecenttracks','&limit=12'),
-      llamar('user.gettopalbums','&period=1month&limit=12'),
-      llamar('user.getlovedtracks','&limit=12')
+    const q = encodeURIComponent(`${artista} ${cancion}`);
+    const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet` +
+      `&maxResults=1&type=video&q=${q}&key=${CONFIG.YOUTUBE_API_KEY}`);
+    const d = await r.json();
+    if(d.error){
+      if(d.error.code === 403 && !avisadoCuotaYT){
+        avisadoCuotaYT = true;
+        avisar('⚠ Cuota de búsqueda de YouTube agotada por hoy · vuelve a intentarlo mañana');
+      }
+      return null;
+    }
+    const id = (d.items && d.items[0]) ? d.items[0].id.videoId : null;
+    c[clave] = id;
+    guardarCacheYT(c);
+    return id;
+  }catch(_){ return null; }
+}
+async function resolverPistaLastfm(i, reproducir){
+  const t = ALBUM.tracks[i];
+  if(!t || t._resolviendo) return;
+  t._resolviendo = true;
+  const id = await buscarEnYouTube(t._artista, t._cancion);
+  t._resolviendo = false;
+  if(pista !== i) return;  // el usuario ya se movió a otra pista mientras buscábamos
+  if(!id){
+    t._sinVideo = true;
+    marcarRota();
+    if(reproducir) siguiente();
+    return;
+  }
+  t.videoId = id;
+  cargar(i, reproducir);
+}
+
+/* una pista de Last.fm lista para el reproductor (aún sin videoId) */
+function pistaLF(artista, cancion, num){
+  return {num, titulo: `${artista} — ${cancion}`, duracion: null, videoId: null,
+           _lf: true, _artista: artista, _cancion: cancion};
+}
+/* abre cualquier lista de pistas de Last.fm en el reproductor grande */
+function abrirListaLF(titulo, tracks, indiceInicial){
+  // en vez de cargar la pista 0 y LUEGO saltar a la pulsada (dos cargar()
+  // en paralelo, y la resolución de YouTube de la primera pisa a la
+  // segunda), se rota la lista para que la pista pulsada quede primera
+  let lista = tracks;
+  if(typeof indiceInicial === 'number' && indiceInicial > 0){
+    lista = tracks.slice(indiceInicial).concat(tracks.slice(0, indiceInicial));
+  }
+  abrirAlbumObjeto({artista: 'LAST.FM', album: titulo, año: null, portada: null,
+                     generos: [], estilos: [], pais: null, tracks: lista}, true);
+}
+
+/* ---------- sub-navegación ---------- */
+let lfInicializado = false;
+function initLastfm(){
+  if(lfInicializado) return;
+  lfInicializado = true;
+  cargarDashboard();
+}
+function mostrarLF(cual){
+  document.querySelectorAll('#lf-nav .chip').forEach(b=>
+    b.classList.toggle('activo', b.dataset.lf === cual));
+  document.querySelectorAll('.lf-panel').forEach(p=>
+    p.classList.toggle('activo', p.id === 'lf-p-' + cual));
+  if(cual === 'dashboard') cargarDashboard();
+  else if(cual === 'kinoplayer') cargarKinoPlayer();
+  else if(cual === 'isla') cargarIsla();
+  else if(cual === 'retro') cargarRetrovisor();
+}
+
+/* ---------- 1. DASHBOARD ---------- */
+let lfDashCargado = false;
+async function cargarDashboard(){
+  if(lfDashCargado) return;
+  lfDashCargado = true;
+  try{
+    const [info, rec, top, loved] = await Promise.all([
+      lfm('user.getinfo'),
+      lfm('user.getrecenttracks', '&limit=12&extended=1'),
+      lfm('user.gettopalbums', '&period=1month&limit=12'),
+      lfm('user.getlovedtracks', '&limit=12')
     ]);
+    const u = info.user || {};
+    $('lf-stats').innerHTML = [
+      [Number(u.playcount || 0).toLocaleString(), 'scrobbles'],
+      [Number(u.artist_count || 0).toLocaleString(), 'artistas'],
+      [Number(u.track_count || 0).toLocaleString(), 'canciones'],
+      [(u.registered && u.registered.unixtime) ?
+        new Date(u.registered.unixtime * 1000).getFullYear() : '—', 'desde']
+    ].map(([n, l]) => `<div class="lf-stat"><b>${n}</b><span>${l}</span></div>`).join('');
+
+    const recTracks = (rec.recenttracks || {}).track || [];
     pintarListaLF('lf-recientes',
-      ((rec.recenttracks||{}).track||[]).map(t=>({
-        img:(t.image&&t.image[2]?t.image[2]['#text']:''),
-        t1:t.name, t2:(t.artist?t.artist['#text']:''),
-        extra:(t['@attr']&&t['@attr'].nowplaying)?'▶ AHORA':''})));
+      recTracks.map(t => ({img: imgLF(t), t1: t.name, t2: nombreArtista(t),
+        extra: (t['@attr'] && t['@attr'].nowplaying) ? '▶ AHORA' : ''})),
+      recTracks.map((t, i) => pistaLF(nombreArtista(t), t.name, i + 1)),
+      'Escuchado recientemente');
+
+    const topAlbums = (top.topalbums || {}).album || [];
     pintarListaLF('lf-top',
-      ((top.topalbums||{}).album||[]).map(a=>({
-        img:(a.image&&a.image[2]?a.image[2]['#text']:''),
-        t1:a.name, t2:(a.artist?a.artist.name:''),
-        extra:a.playcount+' esc.'})));
+      topAlbums.map(a => ({img: imgLF(a), t1: a.name, t2: (a.artist ? a.artist.name : ''),
+        extra: a.playcount + ' esc.'})));
+
+    const lovedTracks = (loved.lovedtracks || {}).track || [];
     pintarListaLF('lf-loved',
-      ((loved.lovedtracks||{}).track||[]).map(t=>({
-        img:(t.image&&t.image[2]?t.image[2]['#text']:''),
-        t1:t.name, t2:(t.artist?t.artist.name:''),
-        extra:'❤'})));
+      lovedTracks.map(t => ({img: imgLF(t), t1: t.name, t2: (t.artist ? t.artist.name : ''), extra: '❤'})),
+      lovedTracks.map((t, i) => pistaLF(t.artist ? t.artist.name : '', t.name, i + 1)),
+      'Favoritas ❤');
   }catch(e){
-    $('lf-recientes').textContent='Error cargando Last.fm';
-    lastfmCargado=false;
+    $('lf-recientes').innerHTML = '<div class="lf-vacio">Error cargando Last.fm</div>';
+    lfDashCargado = false;
   }
 }
-function pintarListaLF(id, items){
-  const c=$(id); c.innerHTML='';
-  items.forEach(it=>{
-    const d=document.createElement('div');
-    d.className='lf-item';
-    d.innerHTML=`${it.img?`<img src="${it.img}" alt="">`:'<div class="lf-ph"></div>'}
-      <div><b>${it.t1||''}</b><span>${it.t2||''}</span></div>
-      <i>${it.extra||''}</i>`;
+function pintarListaLF(id, items, tracksLF, tituloLista){
+  const c = $(id); c.innerHTML = '';
+  if(!items.length){ c.innerHTML = '<div class="lf-vacio">Sin datos</div>'; return; }
+  items.forEach((it, i) => {
+    const d = document.createElement('div');
+    d.className = 'lf-item';
+    d.innerHTML = `${it.img ? `<img src="${it.img}" alt="">` : '<div class="lf-ph"></div>'}
+      <div><b>${it.t1 || ''}</b><span>${it.t2 || ''}</span></div>
+      <i>${it.extra || ''}</i>`;
+    if(tracksLF){
+      d.style.cursor = 'pointer';
+      d.onclick = () => abrirListaLF(tituloLista || 'LAST.FM', tracksLF, i);
+    }
     c.appendChild(d);
   });
+}
+
+/* ---------- 2. KINOPLAYER ---------- */
+let kpModoActual = 'top';
+function kpModo(m){
+  kpModoActual = m;
+  $('kp-modo-top').classList.toggle('activo', m === 'top');
+  $('kp-modo-loved').classList.toggle('activo', m === 'loved');
+  cargarKinoPlayer();
+}
+async function cargarKinoPlayer(){
+  const el = $('kp-lista');
+  el.innerHTML = '<div class="lf-cargando">Cargando…</div>';
+  try{
+    let tracks;
+    if(kpModoActual === 'top'){
+      const data = await lfm('user.gettoptracks', `&period=${$('kp-periodo').value}&limit=60`);
+      tracks = (data.toptracks || {}).track || [];
+    }else{
+      const data = await lfm('user.getlovedtracks', '&limit=60');
+      tracks = (data.lovedtracks || {}).track || [];
+    }
+    if(!tracks.length){ el.innerHTML = '<div class="lf-vacio">Sin resultados</div>'; return; }
+    const listaLF = tracks.map((t, i) => pistaLF(nombreArtista(t), t.name, i + 1));
+    el.innerHTML = '';
+    tracks.forEach((t, i) => {
+      const img = imgLF(t);
+      const d = document.createElement('div');
+      d.className = 'lf-track';
+      d.innerHTML = `<span class="lf-num">${i + 1}</span>
+        ${img ? `<img src="${img}" alt="">` : '<div class="lf-ph"></div>'}
+        <div class="lf-txt"><b>${t.name}</b><span>${nombreArtista(t)}</span></div>
+        <i>${t.playcount ? t.playcount + '×' : (kpModoActual === 'loved' ? '❤' : '')}</i>`;
+      d.onclick = () => abrirListaLF(
+        kpModoActual === 'top' ? 'KinoPlayer · top tracks' : 'KinoPlayer · favoritas', listaLF, i);
+      el.appendChild(d);
+    });
+  }catch(e){
+    el.innerHTML = '<div class="lf-vacio">Error cargando Last.fm</div>';
+  }
+}
+
+/* ---------- 3. MÁQUINA DEL TIEMPO ---------- */
+async function viajarEnElTiempo(){
+  const val = $('tm-fecha').value;
+  if(!val) return;
+  const d = new Date(val + 'T00:00:00');
+  const from = Math.floor(d.getTime() / 1000);
+  const to = from + 86399;
+  const el = $('tm-lista');
+  el.innerHTML = '<div class="lf-cargando">Viajando…</div>';
+  $('tm-stats').style.display = 'none';
+  try{
+    const data = await lfm('user.getrecenttracks', `&from=${from}&to=${to}&limit=200&extended=1`);
+    const rt = data.recenttracks || {};
+    let tracks = Array.isArray(rt.track) ? rt.track : (rt.track ? [rt.track] : []);
+    tracks = tracks.filter(t => t.date);
+    if(!tracks.length){
+      el.innerHTML = '<div class="lf-vacio">🌌 Sin scrobbles ese día. Prueba otra fecha.</div>';
+      return;
+    }
+    const total = (rt['@attr'] && rt['@attr'].total) || tracks.length;
+    const primero = tracks[tracks.length - 1], ultimo = tracks[0];
+    $('tm-stats').innerHTML = [
+      [total, 'canciones ese día'],
+      [primero.name, 'primera · ' + nombreArtista(primero)],
+      [ultimo.name, 'última · ' + nombreArtista(ultimo)]
+    ].map(([n, l]) => `<div class="lf-stat"><b style="font-size:13px">${n}</b><span>${l}</span></div>`).join('');
+    $('tm-stats').style.display = 'grid';
+    const listaLF = tracks.map((t, i) => pistaLF(nombreArtista(t), t.name, i + 1));
+    el.innerHTML = '';
+    tracks.forEach((t, i) => {
+      const hora = (t.date && t.date['#text']) ? t.date['#text'].split(', ')[1] : '';
+      const img = imgLF(t);
+      const d2 = document.createElement('div');
+      d2.className = 'lf-track';
+      d2.innerHTML = `<span class="lf-num">${hora || ''}</span>
+        ${img ? `<img src="${img}" alt="">` : '<div class="lf-ph"></div>'}
+        <div class="lf-txt"><b>${t.name}</b><span>${nombreArtista(t)}</span></div>
+        ${t.loved === '1' ? '<i>❤</i>' : ''}`;
+      d2.onclick = () => abrirListaLF('Máquina del tiempo · ' + val, listaLF, i);
+      el.appendChild(d2);
+    });
+  }catch(e){
+    el.innerHTML = '<div class="lf-vacio">Error viajando en el tiempo</div>';
+  }
+}
+
+/* ---------- 4. PLAYLIST IA (prompt builder, sin API de pago) ---------- */
+let ultimoPromptIA = '';
+async function generarPromptIA(){
+  const periodo = $('ia-periodo').value;
+  const cont = $('ia-prompt');
+  cont.innerHTML = '<div class="lf-cargando">Reuniendo tu historial…</div>';
+  $('ia-copiar').style.display = 'none';
+  try{
+    const [dTracks, dArtists] = await Promise.all([
+      lfm('user.gettoptracks', `&period=${periodo}&limit=40`),
+      lfm('user.gettopartists', `&period=${periodo}&limit=15`)
+    ]);
+    const tracks = (dTracks.toptracks || {}).track || [];
+    const artistas = (dArtists.topartists || {}).artist || [];
+    const listaTracks = tracks.map(t => `- ${nombreArtista(t)} — ${t.name} (${t.playcount} escuchas)`).join('\n');
+    const listaArtistas = artistas.map(a => `- ${a.name} (${a.playcount} escuchas)`).join('\n');
+    const etiqueta = {'1month': 'el último mes', '3month': 'los últimos 3 meses',
+      '12month': 'el último año', 'overall': 'toda mi historia en Last.fm'}[periodo];
+    const prompt =
+`Eres un curador musical. A partir de mi historial real de escucha en Last.fm de ${etiqueta}, arma una playlist narrativa de exactamente 12 canciones que cuente una historia o tenga un hilo conductor (puede ser un estado de ánimo, un viaje, una hora del día, o lo que se te ocurra a partir de los datos). No repitas artista salvo que sea imprescindible para el hilo.
+
+Para cada canción dame: número, artista, título, y una frase breve de por qué encaja en el hilo narrativo. Cierra con un párrafo explicando el concepto de la playlist.
+
+Mis canciones más escuchadas (${etiqueta}):
+${listaTracks}
+
+Mis artistas más escuchados (${etiqueta}):
+${listaArtistas}
+
+Usa solo música de estas listas o muy cercana en estilo/época a ellas.`;
+    ultimoPromptIA = prompt;
+    cont.innerHTML = `<div class="lf-prompt">${prompt.replace(/</g, '&lt;')}</div>`;
+    $('ia-copiar').style.display = '';
+  }catch(e){
+    cont.innerHTML = '<div class="lf-vacio">Error reuniendo tu historial</div>';
+  }
+}
+function copiarPromptIA(){
+  if(!ultimoPromptIA) return;
+  navigator.clipboard.writeText(ultimoPromptIA)
+    .then(() => avisar('✓ Prompt copiado · pégalo en claude.ai'))
+    .catch(() => avisar('⚠ No se pudo copiar automático, selecciona el texto a mano'));
+}
+
+/* ---------- 5. ISLA DESIERTA ---------- */
+let islaCargada = false;
+async function cargarIsla(){
+  if(islaCargada) return;
+  islaCargada = true;
+  const el = $('isla-lista');
+  try{
+    const [top, loved] = await Promise.all([
+      lfm('user.gettoptracks', '&period=overall&limit=1000'),
+      lfm('user.getlovedtracks', '&limit=1000')
+    ]);
+    const topTracks = (top.toptracks || {}).track || [];
+    const lovedSet = new Set(((loved.lovedtracks || {}).track || [])
+      .map(t => (nombreArtista(t) + '::' + t.name).toLowerCase()));
+    const nucleo = topTracks
+      .filter(t => lovedSet.has((nombreArtista(t) + '::' + t.name).toLowerCase()))
+      .sort((a, b) => (b.playcount || 0) - (a.playcount || 0))
+      .slice(0, 60);
+    if(!nucleo.length){
+      el.innerHTML = '<div class="lf-vacio">Sin cruce (todavía) entre tus más escuchadas y tus favoritas ❤.</div>';
+      return;
+    }
+    const listaLF = nucleo.map((t, i) => pistaLF(nombreArtista(t), t.name, i + 1));
+    el.innerHTML = '';
+    nucleo.forEach((t, i) => {
+      const img = imgLF(t);
+      const d = document.createElement('div');
+      d.className = 'lf-track';
+      d.innerHTML = `<span class="lf-num">${i + 1}</span>
+        ${img ? `<img src="${img}" alt="">` : '<div class="lf-ph"></div>'}
+        <div class="lf-txt"><b>${t.name}</b><span>${nombreArtista(t)}</span></div>
+        <i>♥ ${t.playcount}×</i>`;
+      d.onclick = () => abrirListaLF('Isla desierta', listaLF, i);
+      el.appendChild(d);
+    });
+  }catch(e){
+    el.innerHTML = '<div class="lf-vacio">Error cruzando favoritas y reproducciones</div>';
+    islaCargada = false;
+  }
+}
+
+/* ---------- 6. RETROVISOR ---------- */
+let retroCargado = false;
+async function cargarRetrovisor(){
+  if(retroCargado) return;
+  retroCargado = true;
+  const el = $('retro-lista');
+  try{
+    const info = await lfm('user.getinfo');
+    const inicioTs = info.user && info.user.registered && info.user.registered.unixtime;
+    const anioInicio = inicioTs ? new Date(inicioTs * 1000).getFullYear() : 2008;
+    const hoy = new Date();
+    $('retro-intro').textContent =
+      `Hoy es ${hoy.toLocaleDateString('es-MX', {day: 'numeric', month: 'long'})} — ` +
+      `esto sonaba en años anteriores, desde ${anioInicio}.`;
+    const anios = [];
+    for(let y = hoy.getFullYear() - 1; y >= anioInicio; y--) anios.push(y);
+    el.innerHTML = '<div class="lf-cargando">Consultando años anteriores…</div>';
+    const bloques = [];
+    for(const y of anios){
+      const d = new Date(y, hoy.getMonth(), hoy.getDate(), 0, 0, 0);
+      const from = Math.floor(d.getTime() / 1000);
+      const to = from + 86399;
+      try{
+        const data = await lfm('user.getrecenttracks', `&from=${from}&to=${to}&limit=50&extended=1`);
+        const rt = data.recenttracks || {};
+        let tracks = Array.isArray(rt.track) ? rt.track : (rt.track ? [rt.track] : []);
+        tracks = tracks.filter(t => t.date);
+        if(tracks.length) bloques.push({año: y, tracks});
+      }catch(_){ /* seguir con el siguiente año */ }
+    }
+    if(!bloques.length){
+      el.innerHTML = '<div class="lf-vacio">Sin scrobbles este mismo día en años anteriores.</div>';
+      return;
+    }
+    el.innerHTML = '';
+    bloques.forEach(b => {
+      const h = document.createElement('h3');
+      h.className = 'lf-h'; h.style.marginTop = '18px';
+      h.textContent = `HACE ${hoy.getFullYear() - b.año} AÑOS · ${b.año}`;
+      el.appendChild(h);
+      const listaLF = b.tracks.map((t, i) => pistaLF(nombreArtista(t), t.name, i + 1));
+      b.tracks.forEach((t, i) => {
+        const hora = (t.date && t.date['#text']) ? t.date['#text'].split(', ')[1] : '';
+        const img = imgLF(t);
+        const d = document.createElement('div');
+        d.className = 'lf-track';
+        d.innerHTML = `<span class="lf-num">${hora || ''}</span>
+          ${img ? `<img src="${img}" alt="">` : '<div class="lf-ph"></div>'}
+          <div class="lf-txt"><b>${t.name}</b><span>${nombreArtista(t)}</span></div>
+          ${t.loved === '1' ? '<i>❤</i>' : ''}`;
+        d.onclick = () => abrirListaLF(`Retrovisor · ${b.año}`, listaLF, i);
+        el.appendChild(d);
+      });
+    });
+  }catch(e){
+    el.innerHTML = '<div class="lf-vacio">Error cargando el retrovisor</div>';
+    retroCargado = false;
+  }
 }
 
 /* ====================== EFECTOS DJ (Web Audio, sintetizados) ====================== */
@@ -1991,6 +2555,12 @@ document.addEventListener('keydown', ev=>{
   document.querySelectorAll('.tab').forEach(b=>
     b.onclick = ()=> irTab(b.dataset.tab));
   $('buscador-vinilos').addEventListener('input', pintarVinilos);
+  $('sel-genero-vinilos').addEventListener('change', ev=>{
+    filtroGeneroVin = ev.target.value; pintarVinilos();
+  });
+  $('sel-orden-vinilos').addEventListener('change', pintarVinilos);
+  $('kp-periodo').addEventListener('change', cargarKinoPlayer);
+  $('tm-fecha').max = new Date().toISOString().slice(0, 10);
   if(MODO_EDITAR){
     $('btn-nuevo-album').style.display = '';
     $('btn-nuevo-album').onclick = nuevoAlbum;
