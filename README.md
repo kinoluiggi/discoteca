@@ -43,13 +43,6 @@ y reproducir.
 - **NOVEDADES** — un diario de mis últimas descargas, con carátula y
   reproducción por pista cuando el disco se encuentra en Discogs o iTunes.
 
-## Modo curador
-
-Añadiendo `?editar` a la URL se activa el modo de edición: dar de alta
-álbumes nuevos, añadir/quitar/renombrar pistas, corregir fuentes de audio
-rotas, editar fichas, y todo se guarda directo al repo vía la API de
-GitHub (Contents API) — sin build, sin CI, el sitio se actualiza solo en
-1–2 minutos tras cada commit.
 
 ## Cómo está hecho
 
