@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KinoRecord · La Discoteca</title>
+<meta property="og:title" content="Discoteca · Kinoluiggi">
+<meta property="og:description" content="Discoteca digital personal — miles de álbumes curados, vinilos y estadísticas de escucha.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://kinoluiggi.github.io/discoteca/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Discoteca · Kinoluiggi">
+<meta name="twitter:image" content="https://kinoluiggi.github.io/discoteca/og-image.jpg">
 <link rel="icon" href="favicon.ico">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -345,6 +352,7 @@ input[type=range]::-moz-range-thumb{
   <button class="tab" data-tab="vinilos">VINILOS</button>
   <button class="tab" data-tab="lastfm">LAST.FM</button>
   <button class="tab" data-tab="novedades">NOVEDADES</button>
+  <button class="tab" data-tab="playlists">PLAYLISTS</button>
 </nav>
 
 <!-- ================= VISTA GRID ================= -->
@@ -484,6 +492,15 @@ input[type=range]::-moz-range-thumb{
   </div>
   <div id="novedades-revision" style="display:none;padding:0 26px 20px"></div>
   <div class="grid" id="novedades-lista"></div>
+</div>
+
+<!-- ================= VISTA PLAYLISTS ================= -->
+<div id="vista-playlists" style="display:none">
+  <div class="controles">
+    <button class="btn-azar" onclick="crearPlaylist()">➕ NUEVA PLAYLIST</button>
+    <div class="contador" id="playlists-status"></div>
+  </div>
+  <div id="playlists-lista" class="lf-cols"></div>
 </div>
 
 <!-- ================= VISTA PLAYER ================= -->
@@ -828,7 +845,7 @@ function mostrarMotor(m){
 let scrob = {nowplaying:false, enviado:false, inicio:0};
 
 function scrobblear(payload){
-  if(!CONFIG.SCROBBLE_WORKER) return;
+  if(!CONFIG.SCROBBLE_WORKER || !SOY_YO) return;
   fetch(CONFIG.SCROBBLE_WORKER, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -840,7 +857,7 @@ function scrobNowPlaying(){
   const t = ALBUM.tracks[pista];
   if(!reproducible(t)) return;
   scrob.nowplaying = true;
-  scrobblear({type:'nowplaying', artist:ALBUM.artista,
+  scrobblear({type:'nowplaying', artist:t.artista || ALBUM.artista,
               track:t.titulo, album:ALBUM.album});
 }
 function scrobRevisar(s, d){
@@ -849,7 +866,7 @@ function scrobRevisar(s, d){
   if(s >= Math.min(d/2, 240)){          // 50% de la pista o 4 minutos
     scrob.enviado = true;
     const t = ALBUM.tracks[pista];
-    scrobblear({type:'scrobble', artist:ALBUM.artista,
+    scrobblear({type:'scrobble', artist:t.artista || ALBUM.artista,
                 track:t.titulo, album:ALBUM.album,
                 timestamp: scrob.inicio});
   }
@@ -953,7 +970,7 @@ function pintarAlbumUI(){
     const div=document.createElement('div');
     div.className='pista'+(reproducible(t)?'':' muda');
     div.innerHTML=`<span class="num">${String(t.num||i+1).padStart(2,'0')}</span>
-      <span class="titulo">${t.titulo||'—'}${reproducible(t)?'':' · (sin fuente)'}${t.audio?' · ♪':''}${t.soundcloud?' · ☁':''}</span>
+      <span class="titulo">${t.artista ? t.artista + ' — ' : ''}${t.titulo||'—'}${reproducible(t)?'':' · (sin fuente)'}${t.audio?' · ♪':''}${t.soundcloud?' · ☁':''}</span>
       <span class="dur">${fmt(t.duracion)}</span>`;
     if(MODO_EDITAR && ALBUM._ruta){
       const sube=document.createElement('button');
@@ -971,7 +988,7 @@ function pintarAlbumUI(){
       borra.onclick=ev=>{ ev.stopPropagation(); borrarPista(i); };
       div.appendChild(borra);
       const renom=document.createElement('button');
-      renom.textContent='🏷'; renom.title='Renombrar esta pista';
+      renom.textContent='🏷'; renom.title='Editar artista/título de esta pista';
       renom.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:11px;padding:0 2px';
       renom.onclick=ev=>{ ev.stopPropagation(); renombrarPista(i); };
       div.appendChild(renom);
@@ -989,16 +1006,30 @@ function pintarAlbumUI(){
       lapiz.onclick=ev=>{ ev.stopPropagation(); editarPista(i); };
       div.appendChild(busca); div.appendChild(lapiz);
     }
+    if(reproducible(t)){
+      const add=document.createElement('button');
+      add.textContent='➕'; add.title='Añadir a una playlist';
+      add.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:12px;padding:0 3px';
+      add.onclick=ev=>{ ev.stopPropagation(); elegirPlaylist(t); };
+      div.appendChild(add);
+    }
+    if(ALBUM._playlist){
+      const quita=document.createElement('button');
+      quita.textContent='✕'; quita.title='Quitar de esta playlist';
+      quita.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:11px;padding:0 3px';
+      quita.onclick=ev=>{ ev.stopPropagation(); quitarDePlaylist(ALBUM._playlist, i); };
+      div.appendChild(quita);
+    }
     if(reproducible(t)) div.onclick=()=>{ irA(i); };
     lista.appendChild(div);
   });
 }
 
 let TAB = 'discoteca';
-const VISTAS = {discoteca:'vista-grid', vinilos:'vista-vinilos', lastfm:'vista-lastfm', novedades:'vista-novedades'};
+const VISTAS = {discoteca:'vista-grid', vinilos:'vista-vinilos', lastfm:'vista-lastfm', novedades:'vista-novedades', playlists:'vista-playlists'};
 function irTab(t){
   TAB = t;
-  ['vista-grid','vista-vinilos','vista-lastfm','vista-novedades','vista-player']
+  ['vista-grid','vista-vinilos','vista-lastfm','vista-novedades','vista-playlists','vista-player']
     .forEach(id=>$(id).style.display='none');
   $(VISTAS[t]).style.display='block';
   document.querySelectorAll('.tab').forEach(b=>
@@ -1006,12 +1037,13 @@ function irTab(t){
   if(t==='vinilos') initVinilos();
   if(t==='lastfm') initLastfm();
   if(t==='novedades') initNovedades();
+  if(t==='playlists') pintarPlaylists();
 }
 
 let scrollGuardado = 0;
 function mostrarPlayer(){
   scrollGuardado = window.scrollY;
-  ['vista-grid','vista-vinilos','vista-lastfm','vista-novedades']
+  ['vista-grid','vista-vinilos','vista-lastfm','vista-novedades','vista-playlists']
     .forEach(id=>$(id).style.display='none');
   $('vista-player').style.display='block';
   window.scrollTo(0,0);
@@ -1132,6 +1164,12 @@ function cargar(i, reproducir=false){
       el.classList.toggle('activa', j===i));
   }
   if(!t){ $('t-actual').textContent='0:00'; $('t-total').textContent='0:00'; ponerSeek(0,1); return; }
+  const artistaPista = t.artista || t._artista || ALBUM.artista || '';
+  $('info-artista').textContent = artistaPista;
+  $('titulo-album').innerHTML =
+    (RADIO ? '<span style="color:var(--ambar)">📻 RADIO</span> · ' : '') +
+    `<b>${ALBUM.album||'—'}</b> · ${artistaPista}`;
+  if(!ALBUM.portada) $('pt-artista').textContent = artistaPista;
   if(t._lf && !t.videoId && !t._sinVideo){
     $('t-actual').textContent='0:00'; $('t-total').textContent='···'; ponerSeek(0,1);
     resolverPistaLastfm(i, reproducir);
@@ -1449,6 +1487,16 @@ async function pedirToken(){
 
 /* ====================== MODO CURADOR (?editar) ====================== */
 const MODO_EDITAR = new URLSearchParams(location.search).has('editar');
+
+/* candado de scrobbling: por defecto NADIE scrobblea, ni siquiera tú. Se
+   activa una sola vez visitando el sitio con ?yo=1 (queda guardado en este
+   navegador/dispositivo para siempre) y se apaga con ?yo=0. Así un visitante
+   cualquiera que le dé play nunca te contamina el historial de Last.fm. */
+(function(){
+  const p = new URLSearchParams(location.search);
+  if(p.has('yo')) localStorage.setItem('soy_yo', p.get('yo') === '0' ? '0' : '1');
+})();
+const SOY_YO = localStorage.getItem('soy_yo') === '1';
 let hayCambios = false;
 
 function editarFicha(){
@@ -1513,18 +1561,24 @@ function ordenarPorNum(){
 async function agregarVariasPistas(){
   const bloque = await dialogo({
     titulo: '➕ VARIAS PISTAS',
-    mensaje: 'Una pista por línea, formato:  Título | URL\n' +
+    mensaje: 'Una pista por línea:\n' +
+      '  Título | URL\n' +
+      '  Artista | Título | URL   (para recopilatorios, artista distinto por pista)\n' +
       'La URL es opcional (puedes dejarla vacía y ponerla después con ✎).',
     valor: '', textarea: true});
   if(bloque === null || !bloque.trim()) return;
   const lineas = bloque.split('\n').map(l=>l.trim()).filter(Boolean);
   let n = ALBUM.tracks.length;
   lineas.forEach(linea=>{
-    const [tituloCrudo, urlCruda] = linea.split('|');
+    const partes = linea.split('|').map(p=>p.trim());
+    let artista, tituloCrudo, urlCruda;
+    if(partes.length >= 3){ [artista, tituloCrudo, urlCruda] = partes; }
+    else{ [tituloCrudo, urlCruda] = partes; }
     const titulo = (tituloCrudo||'').trim();
     if(!titulo) return;
     n++;
     const pista = {num: n, titulo, duracion: null, videoId: null};
+    if(artista && artista.trim()) pista.artista = artista.trim();
     if(urlCruda && urlCruda.trim()){
       const f = detectarFuente(limpiarURLPegada(urlCruda.trim()));
       pista.videoId = f.videoId;
@@ -1564,12 +1618,20 @@ function borrarPista(i){
 
 async function renombrarPista(i){
   const t = ALBUM.tracks[i];
-  const resp = await dialogo({
+  const nuevoArtista = await dialogo({
+    titulo: '✎ ARTISTA DE LA PISTA',
+    mensaje: `Vacío = usar el artista del álbum (${ALBUM.artista || '—'}).\n` +
+      `Solo hace falta ponerlo si esta pista es de otro artista (recopilatorios).`,
+    valor: t.artista || ''});
+  if(nuevoArtista === null) return;
+  const nuevoTitulo = await dialogo({
     titulo: '✎ TÍTULO DE LA PISTA',
-    mensaje: `${ALBUM.artista || ''}`,
+    mensaje: `${nuevoArtista.trim() || ALBUM.artista || ''}`,
     valor: t.titulo || ''});
-  if(resp === null) return;
-  t.titulo = resp.trim() || null;
+  if(nuevoTitulo === null) return;
+  t.artista = nuevoArtista.trim() || undefined;
+  if(t.artista === undefined) delete t.artista;
+  t.titulo = nuevoTitulo.trim() || null;
   marcarSucio();
   pintarAlbumUI();
 }
@@ -2812,6 +2874,147 @@ async function guardarNovedades(){
   }else{
     avisar('⚠ Error tras 3 intentos: ' + ultimoError);
   }
+}
+
+/* ====================== PLAYLISTS (localStorage, por navegador) ====================== */
+function leerPlaylists(){
+  try{ return JSON.parse(localStorage.getItem('playlists') || '{}'); }catch(_){ return {}; }
+}
+function guardarPlaylists(pl){
+  try{ localStorage.setItem('playlists', JSON.stringify(pl)); }catch(_){}
+}
+async function crearPlaylist(){
+  const nombre = await dialogo({
+    titulo: '➕ NUEVA PLAYLIST',
+    mensaje: 'Nombre de la playlist.',
+    valor: ''});
+  if(nombre === null || !nombre.trim()) return null;
+  const pl = leerPlaylists();
+  const id = 'pl_' + Date.now();
+  pl[id] = {nombre: nombre.trim(), creada: new Date().toISOString(), tracks: []};
+  guardarPlaylists(pl);
+  pintarPlaylists();
+  return id;
+}
+/* pista "portátil": guarda todo lo que hace falta para reproducirla suelta,
+   sin depender de que el álbum de origen siga abierto */
+function pistaPortatil(t, contexto){
+  return {
+    artista: t.artista || (contexto && contexto.artista) || '',
+    titulo: t.titulo, duracion: t.duracion || null,
+    videoId: t.videoId || null, audio: t.audio, soundcloud: t.soundcloud,
+    fuente: t.fuente, _origenAlbum: contexto ? contexto.album : ''
+  };
+}
+async function elegirPlaylist(t){
+  const pl = leerPlaylists();
+  const ids = Object.keys(pl);
+  let opciones = ids.map((id,i)=>`${i+1}. ${pl[id].nombre} (${pl[id].tracks.length})`).join('\n');
+  const resp = await dialogo({
+    titulo: '➕ AÑADIR A PLAYLIST',
+    mensaje: (ids.length ? `Escribe el número de la playlist:\n${opciones}\n\n` : '') +
+      `O escribe un nombre nuevo para crear una playlist.`,
+    valor: ''});
+  if(resp === null || !resp.trim()) return;
+  const texto = resp.trim();
+  let id;
+  const n = parseInt(texto, 10);
+  if(!isNaN(n) && n >= 1 && n <= ids.length){
+    id = ids[n-1];
+  }else{
+    id = 'pl_' + Date.now();
+    pl[id] = {nombre: texto, creada: new Date().toISOString(), tracks: []};
+  }
+  pl[id].tracks.push(pistaPortatil(t, ALBUM));
+  guardarPlaylists(pl);
+  avisar(`✓ Añadida a "${pl[id].nombre}"`);
+  if(TAB === 'playlists') pintarPlaylists();
+}
+function quitarDePlaylist(id, i){
+  const pl = leerPlaylists();
+  if(!pl[id]) return;
+  pl[id].tracks.splice(i, 1);
+  guardarPlaylists(pl);
+  abrirPlaylist(id);
+}
+async function eliminarPlaylist(id){
+  const pl = leerPlaylists();
+  if(!pl[id]) return;
+  const seguro = await dialogo({
+    titulo: '🗑 ELIMINAR PLAYLIST',
+    mensaje: `"${pl[id].nombre}" · ${pl[id].tracks.length} pistas.\n¿Seguro? No se puede deshacer.`,
+    valor: null});
+  if(!seguro) return;
+  delete pl[id];
+  guardarPlaylists(pl);
+  pintarPlaylists();
+}
+async function renombrarPlaylist(id){
+  const pl = leerPlaylists();
+  if(!pl[id]) return;
+  const nuevo = await dialogo({titulo: '✎ RENOMBRAR PLAYLIST', mensaje: '', valor: pl[id].nombre});
+  if(nuevo === null || !nuevo.trim()) return;
+  pl[id].nombre = nuevo.trim();
+  guardarPlaylists(pl);
+  pintarPlaylists();
+}
+function pintarPlaylists(){
+  const pl = leerPlaylists();
+  const ids = Object.keys(pl).sort((a,b)=> (pl[b].creada||'').localeCompare(pl[a].creada||''));
+  $('playlists-status').textContent = ids.length ? `${ids.length} PLAYLISTS` : '';
+  const cont = $('playlists-lista');
+  cont.innerHTML = '';
+  if(!ids.length){
+    cont.innerHTML = '<div class="lf-vacio">Sin playlists todavía · usa ➕ NUEVA PLAYLIST, ' +
+      'o el botón ➕ junto a cualquier pista mientras escuchas.</div>';
+    return;
+  }
+  ids.forEach(id=>{
+    const p = pl[id];
+    const div = document.createElement('div');
+    div.innerHTML = `<h3 class="lf-h" style="cursor:pointer">${p.nombre} · ${p.tracks.length} pistas</h3>`;
+    div.querySelector('h3').onclick = () => abrirPlaylist(id);
+    const acciones = document.createElement('div');
+    acciones.style.cssText = 'display:flex;gap:6px;margin:-6px 0 10px';
+    const bRen = document.createElement('button');
+    bRen.className='chip'; bRen.style.cssText='font-size:9px;padding:3px 8px';
+    bRen.textContent = '✎ RENOMBRAR'; bRen.onclick = () => renombrarPlaylist(id);
+    const bDel = document.createElement('button');
+    bDel.className='chip'; bDel.style.cssText='font-size:9px;padding:3px 8px';
+    bDel.textContent = '🗑 ELIMINAR'; bDel.onclick = () => eliminarPlaylist(id);
+    acciones.appendChild(bRen); acciones.appendChild(bDel);
+    div.appendChild(acciones);
+    const lista = document.createElement('div');
+    if(!p.tracks.length){
+      lista.innerHTML = '<div class="lf-vacio">Vacía por ahora</div>';
+    }else{
+      p.tracks.slice(0, 5).forEach(t=>{
+        const it = document.createElement('div');
+        it.className = 'lf-item';
+        it.innerHTML = `<div class="lf-ph"></div>
+          <div><b>${t.titulo||''}</b><span>${t.artista||''}</span></div>`;
+        lista.appendChild(it);
+      });
+      if(p.tracks.length > 5){
+        const mas = document.createElement('div');
+        mas.className = 'lf-vacio';
+        mas.textContent = `+ ${p.tracks.length - 5} más — clic en el nombre para ver todas`;
+        lista.appendChild(mas);
+      }
+    }
+    div.appendChild(lista);
+    cont.appendChild(div);
+  });
+}
+function abrirPlaylist(id){
+  const pl = leerPlaylists();
+  const p = pl[id];
+  if(!p) return;
+  const tracks = p.tracks.map((t,i)=>({...t, num:i+1}));
+  abrirAlbumObjeto({
+    artista: 'PLAYLIST', album: p.nombre, año: null, portada: null,
+    generos: [], estilos: [], pais: null, tracks, _playlist: id
+  }, false);
 }
 
 /* ====================== EFECTOS DJ (Web Audio, sintetizados) ====================== */
