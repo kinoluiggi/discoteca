@@ -846,7 +846,7 @@ function mostrarMotor(m){
 let scrob = {nowplaying:false, enviado:false, inicio:0};
 
 function scrobblear(payload){
-  if(!CONFIG.SCROBBLE_WORKER || !SOY_YO) return;
+  if(!CONFIG.SCROBBLE_WORKER) return;
   fetch(CONFIG.SCROBBLE_WORKER, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -1488,16 +1488,6 @@ async function pedirToken(){
 
 /* ====================== MODO CURADOR (?editar) ====================== */
 const MODO_EDITAR = new URLSearchParams(location.search).has('editar');
-
-/* candado de scrobbling: por defecto NADIE scrobblea, ni siquiera tú. Se
-   activa una sola vez visitando el sitio con ?yo=1 (queda guardado en este
-   navegador/dispositivo para siempre) y se apaga con ?yo=0. Así un visitante
-   cualquiera que le dé play nunca te contamina el historial de Last.fm. */
-(function(){
-  const p = new URLSearchParams(location.search);
-  if(p.has('yo')) localStorage.setItem('soy_yo', p.get('yo') === '0' ? '0' : '1');
-})();
-const SOY_YO = localStorage.getItem('soy_yo') === '1';
 let hayCambios = false;
 
 function editarFicha(){
