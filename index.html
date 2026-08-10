@@ -947,7 +947,12 @@ function pintarAlbumUI(){
     b4.title = 'Pegar varias pistas de golpe (una por línea)';
     b4.style.cssText = b1.style.cssText;
     b4.onclick = agregarVariasPistas;
-    cont.appendChild(b1); cont.appendChild(b2); cont.appendChild(b3); cont.appendChild(b4);
+    const b5 = document.createElement('button');
+    b5.textContent = '🪄 AUTOCOMPLETAR';
+    b5.title = 'Buscar en YouTube las pistas sin fuente, y la portada si falta';
+    b5.style.cssText = b1.style.cssText;
+    b5.onclick = autocompletarAlbum;
+    cont.appendChild(b1); cont.appendChild(b2); cont.appendChild(b3); cont.appendChild(b4); cont.appendChild(b5);
     cabPl.appendChild(cont);
   }
   // botón de edición de ficha (modo curador)
@@ -1549,6 +1554,35 @@ function ordenarPorNum(){
   pintarAlbumUI();
 }
 
+async function autocompletarAlbum(){
+  if(!ALBUM || !ALBUM.tracks.length) return;
+  const faltantes = ALBUM.tracks.filter(t => !t.videoId && !t.audio && !t.soundcloud);
+  const necesitaPortada = !ALBUM.portada;
+  if(!faltantes.length && !necesitaPortada){
+    avisar('✓ Este álbum ya tiene todo completo');
+    return;
+  }
+  avisar(`🪄 Buscando ${faltantes.length} pista(s)${necesitaPortada ? ' y portada' : ''}...`);
+  let encontradas = 0;
+  for(const t of faltantes){
+    const id = await buscarEnYouTube(t.artista || ALBUM.artista, t.titulo);
+    if(id){
+      t.videoId = id;
+      t.fuente = 'auto-yt';
+      encontradas++;
+    }
+    pintarAlbumUI();  // refresca la lista pista a pista, para ver el avance
+  }
+  if(necesitaPortada){
+    const url = await buscarCaratula(ALBUM.artista, ALBUM.album);
+    if(url) ALBUM.portada = url;
+  }
+  regenerarOrden();
+  marcarSucio();
+  pintarAlbumUI();
+  avisar(`✓ Autocompletado: ${encontradas}/${faltantes.length} pistas encontradas` +
+    `${necesitaPortada && ALBUM.portada ? ' + portada' : ''}. Revisa y guarda.`);
+}
 async function agregarVariasPistas(){
   const bloque = await dialogo({
     titulo: '➕ VARIAS PISTAS',
