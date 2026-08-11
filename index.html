@@ -1472,6 +1472,31 @@ function decodificarJSONGitHub(d, nombreArchivo){
   }
   return JSON.parse(utoaDecode(d.content));
 }
+/* lee un JSON del repo por la Contents API; si el archivo pesa más de 1MB
+   esa API no incluye su contenido (solo metadatos como el sha), así que
+   se cae al Git Data API (blobs), que sí soporta archivos más grandes.
+   Devuelve {datos, sha, existe} — datos=null y existe=false si es 404
+   (archivo que aún no existe, caso normal para altas nuevas). */
+async function leerJSONRepoGitHub(ruta, cab, nombreArchivo){
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${ruta}`;
+  const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
+  if(r1.status === 404) return {datos: null, sha: undefined, existe: false};
+  if(!r1.ok) throw new Error(`leyendo ${nombreArchivo}: ${r1.status}`);
+  const d = await r1.json();
+  if(d.content !== undefined && d.content !== null){
+    return {datos: JSON.parse(utoaDecode(d.content)), sha: d.sha, existe: true};
+  }
+  // archivo grande: la Contents API no trae el contenido — usar el blob
+  if(!d.sha) throw new Error(`${nombreArchivo}: no se pudo determinar el sha del archivo`);
+  const rBlob = await fetch(
+    `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/git/blobs/${d.sha}`, {headers: cab});
+  if(!rBlob.ok) throw new Error(`leyendo blob de ${nombreArchivo}: ${rBlob.status}`);
+  const db = await rBlob.json();
+  if(db.content === undefined || db.content === null){
+    throw new Error(`${nombreArchivo}: tampoco se pudo leer vía blob. No se sobrescribe nada por seguridad.`);
+  }
+  return {datos: JSON.parse(utoaDecode(db.content)), sha: d.sha, existe: true};
+}
 function avisar(msg){
   const t = $('toast');
   t.textContent = msg;
@@ -1780,8 +1805,8 @@ async function guardarEnGitHub(){
 }
 
 async function registrarEnIndice(cab){
-  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}` +
-              `/contents/${BASE}indice.json`;
+  const rutaIndice = `${BASE}indice.json`;
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${rutaIndice}`;
   const entrada = {
     id: ALBUM.id, a: ALBUM.artista, t: ALBUM.album, y: ALBUM.año,
     p: ALBUM.portada, n: ALBUM.tracks.length,
@@ -1790,17 +1815,14 @@ async function registrarEnIndice(cab){
   };
   for(let intento = 1; intento <= 3; intento++){
     try{
-      const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
-      if(!r1.ok) throw new Error('leyendo indice: ' + r1.status);
-      const d = await r1.json();
-      let lista;
-      lista = decodificarJSONGitHub(d, 'indice.json');
+      const {datos, sha} = await leerJSONRepoGitHub(rutaIndice, cab, 'indice.json');
+      const lista = datos || [];
       if(!lista.some(e=>e.id === entrada.id)) lista.push(entrada);
       const r2 = await fetch(api, {
         method: 'PUT', headers: cab,
         body: JSON.stringify({
           message: `curador: alta #${entrada.id} — ${entrada.a} — ${entrada.t}`,
-          content: utoa(JSON.stringify(lista)), sha: d.sha, branch: 'main'
+          content: utoa(JSON.stringify(lista)), sha, branch: 'main'
         })
       });
       if(r2.status === 409){ await new Promise(res => setTimeout(res, 2500)); continue; }
@@ -1845,15 +1867,8 @@ async function guardarVinilo(){
   let ok = false, ultimoError = '';
   for(let intento = 1; intento <= 3 && !ok; intento++){
     try{
-      let overrides = {}, sha = null;
-      const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
-      if(r1.ok){
-        const d = await r1.json();
-        sha = d.sha;
-        overrides = decodificarJSONGitHub(d, 'vinilos_overrides.json');
-      } else if(r1.status !== 404){
-        throw new Error('leyendo overrides: ' + r1.status);
-      }
+      const {datos, sha} = await leerJSONRepoGitHub(ruta, cab, 'vinilos_overrides.json');
+      const overrides = datos || {};
       overrides[ALBUM._discogsId] = propio;
       const cuerpo = {
         message: `curador: vinilo ${ALBUM.artista} — ${ALBUM.album}`,
@@ -1916,16 +1931,11 @@ async function eliminarAlbum(){
     const rutaElim = BASE + 'eliminados.json';
     let ok = false;
     for(let intento = 1; intento <= 3 && !ok; intento++){
-      let lista = [], shaE = null;
-      const rE = await fetch(base + rutaElim + '?ref=main&t=' + Date.now(), {headers: cab});
-      if(rE.ok){
-        const d = await rE.json();
-        shaE = d.sha;
-        try{ lista = JSON.parse(atob(d.content.replace(/\n/g,''))); }catch(_){}
-      }
+      const {datos, sha: shaE} = await leerJSONRepoGitHub(rutaElim, cab, 'eliminados.json');
+      let lista = datos || [];
       if(!lista.includes(ALBUM.id)) lista.push(ALBUM.id);
       const cuerpo = {message: `curador: baja #${ALBUM.id}`,
-                      content: btoa(JSON.stringify(lista)), branch: 'main'};
+                      content: utoa(JSON.stringify(lista)), branch: 'main'};
       if(shaE) cuerpo.sha = shaE;
       const rP = await fetch(base + rutaElim, {
         method: 'PUT', headers: cab, body: JSON.stringify(cuerpo)});
@@ -2820,21 +2830,14 @@ async function eliminarNovedad(n){
   if(!seguro) return;
   const token = await pedirToken();
   if(!token) return;
-  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${BASE}novedades.json`;
+  const rutaNov = `${BASE}novedades.json`;
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${rutaNov}`;
   const cab = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'};
   let ok = false, ultimoError = '';
   for(let intento = 1; intento <= 3 && !ok; intento++){
     try{
-      const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
-      let lista = [], sha;
-      if(r1.ok){
-        const d = await r1.json();
-        sha = d.sha;
-        lista = decodificarJSONGitHub(d, 'novedades.json');
-      } else if(r1.status !== 404){
-        throw new Error('leyendo novedades: ' + r1.status);
-      }
-      lista = lista.filter(x => x.carpeta !== n.carpeta);
+      const {datos, sha} = await leerJSONRepoGitHub(rutaNov, cab, 'novedades.json');
+      let lista = (datos || []).filter(x => x.carpeta !== n.carpeta);
       const r2 = await fetch(api, {method: 'PUT', headers: cab, body: JSON.stringify({
         message: `curador: quitar novedad — ${n.carpeta}`,
         content: utoa(JSON.stringify(lista)), sha, branch: 'main'
@@ -2861,20 +2864,14 @@ async function guardarNovedades(){
   if(!token) return;
   const nuevas = novedadesRevision.filter(n => n.incluir)
     .map(({carpeta, fecha, artista, album, año}) => ({carpeta, fecha, artista, album, año}));
-  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${BASE}novedades.json`;
+  const rutaNov = `${BASE}novedades.json`;
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${rutaNov}`;
   const cab = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'};
   let ok = false, ultimoError = '';
   for(let intento = 1; intento <= 3 && !ok; intento++){
     try{
-      let lista = [], sha;
-      const r1 = await fetch(api + '?ref=main&t=' + Date.now(), {headers: cab});
-      if(r1.ok){
-        const d = await r1.json();
-        sha = d.sha;
-        lista = decodificarJSONGitHub(d, 'novedades.json');
-      } else if(r1.status !== 404){
-        throw new Error('leyendo novedades: ' + r1.status);
-      }
+      const {datos, sha} = await leerJSONRepoGitHub(rutaNov, cab, 'novedades.json');
+      let lista = datos || [];
       const existentes = new Set(lista.map(x => x.carpeta));
       nuevas.forEach(n => { if(!existentes.has(n.carpeta)) lista.push(n); });
       const cuerpo = {message: `curador: +${nuevas.length} novedades`,
