@@ -1483,16 +1483,16 @@ async function leerJSONRepoGitHub(ruta, cab, nombreArchivo){
   if(r1.status === 404) return {datos: null, sha: undefined, existe: false};
   if(!r1.ok) throw new Error(`leyendo ${nombreArchivo}: ${r1.status}`);
   const d = await r1.json();
-  if(d.content !== undefined && d.content !== null){
+  if(d.content !== undefined && d.content !== null && d.content !== ''){
     return {datos: JSON.parse(utoaDecode(d.content)), sha: d.sha, existe: true};
   }
-  // archivo grande: la Contents API no trae el contenido — usar el blob
+  // archivo grande: la Contents API manda content vacío ("") o lo omite — usar el blob
   if(!d.sha) throw new Error(`${nombreArchivo}: no se pudo determinar el sha del archivo`);
   const rBlob = await fetch(
     `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/git/blobs/${d.sha}`, {headers: cab});
   if(!rBlob.ok) throw new Error(`leyendo blob de ${nombreArchivo}: ${rBlob.status}`);
   const db = await rBlob.json();
-  if(db.content === undefined || db.content === null){
+  if(db.content === undefined || db.content === null || db.content === ''){
     throw new Error(`${nombreArchivo}: tampoco se pudo leer vía blob. No se sobrescribe nada por seguridad.`);
   }
   return {datos: JSON.parse(utoaDecode(db.content)), sha: d.sha, existe: true};
