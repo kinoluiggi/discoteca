@@ -370,10 +370,9 @@ input[type=range]::-moz-range-thumb{
     </select>
     <button class="btn-azar" id="btn-disco-azar">🎲 DISCO AL AZAR</button>
     <button class="btn-azar" id="btn-radio">📻 RADIO</button>
-    <button class="chip" onclick="radioMood('alegre')">☀️ ALEGRE</button>
-    <button class="chip" onclick="radioMood('sombria')">🌙 SOMBRÍA</button>
-    <button class="chip" onclick="radioMood('baile')">💃 BAILE</button>
-    <button class="chip" onclick="radioMood('latino')">🌎 LATINO</button>
+    <select class="selector" id="sel-tema" onchange="radioTema(this.value); this.value=''">
+      <option value="">🎭 TEMAS: ELEGIR...</option>
+    </select>
     <button class="btn-azar" id="btn-nuevo-album" style="display:none">➕ NUEVO ÁLBUM</button>
     <div class="contador" id="contador"></div>
   </div>
@@ -1096,29 +1095,45 @@ function pintarColaUI(){
   if(act) act.scrollIntoView({block:'nearest'});
 }
 
-/* mapeo de estado de ánimo -> géneros o países del catálogo. Se puede
-   ajustar esta tabla libremente si algún género queda mal clasificado */
-const MOODS = {
-  alegre:  {generos: ['Pop','Funk','Disco','Ska','Dancehall','Highlife','Soul','Soca']},
-  sombria: {generos: ['Blues','Doom Metal','Ambient','Slowcore','Post-Rock','Drone','Dark Ambient','Gothic Rock']},
-  baile:   {generos: ['Disco','House','Funk','Reggaeton','Cumbia','Salsa','Dancehall','Afrobeat','Merengue']},
-  latino:  {paises: ['México','Colombia','Argentina','España','Cuba','Perú','Chile','Venezuela',
-                      'Brasil','República Dominicana','Puerto Rico','Uruguay','Ecuador','Bolivia',
-                      'Paraguay','Panamá','Costa Rica','Guatemala','Honduras','El Salvador','Nicaragua']}
-};
-async function radioMood(clave){
-  const m = MOODS[clave];
-  if(!m) return;
-  let candidatos = visiblesAhora().filter(e=>e.v>0);  // respeta década/género/país/texto ya activos
-  if(m.generos){
-    const gs = m.generos.map(g=>g.toLowerCase());
+/* temas para el radio: cada uno combina género, país y/o década.
+   Para agregar uno nuevo, solo hace falta una línea más aquí — no hace
+   falta tocar el HTML, el desplegable se llena solo con esta lista. */
+const TEMAS = [
+  {id:'alegre',   nombre:'☀️ Alegre',   generos:['Pop','Funk','Disco','Ska','Dancehall','Highlife','Soul','Soca']},
+  {id:'sombria',  nombre:'🌙 Sombría',  generos:['Blues','Doom Metal','Ambient','Slowcore','Post-Rock','Drone','Dark Ambient','Gothic Rock']},
+  {id:'baile',    nombre:'💃 Baile',    generos:['Disco','House','Funk','Reggaeton','Cumbia','Salsa','Dancehall','Afrobeat','Merengue']},
+  {id:'latino',   nombre:'🌎 Latino',   paises:['México','Colombia','Argentina','España','Cuba','Perú','Chile','Venezuela',
+                                                 'Brasil','República Dominicana','Puerto Rico','Uruguay','Ecuador','Bolivia',
+                                                 'Paraguay','Panamá','Costa Rica','Guatemala','Honduras','El Salvador','Nicaragua']},
+  {id:'reggae-ja-70s', nombre:'🇯🇲 Reggae Jamaicano · 70s',
+                        generos:['Reggae','Roots Reggae','Rocksteady','Dub'], paises:['Jamaica'], decada:1970},
+  {id:'rock-es-60s',   nombre:'🇪🇸 Rock Español · 60s',
+                        generos:['Rock','Garage Rock','Beat'], paises:['España'], decada:1960}
+];
+function pintarSelectorTemas(){
+  const sel = $('sel-tema');
+  TEMAS.forEach(t=>{
+    const o = document.createElement('option');
+    o.value = t.id; o.textContent = t.nombre;
+    sel.appendChild(o);
+  });
+}
+async function radioTema(id){
+  const t = TEMAS.find(x=>x.id===id);
+  if(!t) return;
+  let candidatos = visiblesAhora().filter(e=>e.v>0);  // respeta filtros ya activos, además de los del tema
+  if(t.generos){
+    const gs = t.generos.map(g=>g.toLowerCase());
     candidatos = candidatos.filter(e=>(e.generos||[]).some(g=>gs.includes((g||'').toLowerCase())));
   }
-  if(m.paises){
-    candidatos = candidatos.filter(e=> m.paises.includes(paisDe(e)));
+  if(t.paises){
+    candidatos = candidatos.filter(e=> t.paises.includes(paisDe(e)));
+  }
+  if(t.decada){
+    candidatos = candidatos.filter(e=> decadaDe(e.año) === t.decada);
   }
   if(!candidatos.length){
-    avisar('⚠ Sin discos para ese estado de ánimo con los filtros que tienes activos ahora');
+    avisar('⚠ Sin discos para ese tema con los filtros que tienes activos ahora');
     return;
   }
   radioCandidatos = candidatos;
@@ -3264,6 +3279,7 @@ document.addEventListener('keydown', ev=>{
     $('btn-nuevo-album').onclick = nuevoAlbum;
   }
   await cargarIndice();
+  pintarSelectorTemas();
   pintarChips();
   pintarSelectores();
   pintarGrid();
