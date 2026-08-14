@@ -1115,6 +1115,9 @@ const PAISES_AFRICA = ['Senegal','Mali','Malí','Ghana','Nigeria','Congo','Democ
   'Camerún','Kenia','Benín','Burkina Faso','Cabo Verde','Costa de Marfil','Egipto','Etiopía','Gambia',
   'Guinea','Marruecos','Sudáfrica','Túnez','Argelia','Dakar','Bamako','Abidjan','Algiers','Tunis'];
 const PAISES_ARABE = ['Marruecos','Argelia','Túnez','Egipto','Líbano','Algiers','Tunis'];
+const PAISES_ANGLO = [...PAISES_US, ...PAISES_UK,
+  'Canadá','British Columbia','Fredericton','Montréal','New Brunswick','Québec','Vancouver',
+  'Australia','Brisbane','Byron Bay','Sydney','Irlanda','Nueva Zelanda','Auckland'];
 
 /* temas para el radio: cada uno combina género, país y/o década.
    Para agregar uno nuevo, solo hace falta una línea más aquí — no hace
@@ -1135,10 +1138,10 @@ const TEMAS = [
                                   'The Heartbreakers','The Stooges','MC5','New York Dolls',
                                   'The Dictators','The Undertones','Iggy Pop','Angelic Upstarts',
                                   'Radio Birdman']},
-  {id:'rock-60s',      nombre:'🎵 Rock Clásico · 60s',   generos:['Rock'], decada:1960},
-  {id:'rock-70s',      nombre:'🎵 Rock Clásico · 70s',   generos:['Rock'], decada:1970},
-  {id:'rock-80s',      nombre:'🎵 Rock Clásico · 80s',   generos:['Rock'], decada:1980},
-  {id:'rock-90s',      nombre:'🎵 Rock Clásico · 90s',   generos:['Rock'], decada:1990},
+  {id:'rock-60s',      nombre:'🎵 Rock Clásico Anglo · 60s',   generos:['Rock'], decada:1960, paises:PAISES_ANGLO},
+  {id:'rock-70s',      nombre:'🎵 Rock Clásico Anglo · 70s',   generos:['Rock'], decada:1970, paises:PAISES_ANGLO},
+  {id:'rock-80s',      nombre:'🎵 Rock Clásico Anglo · 80s',   generos:['Rock'], decada:1980, paises:PAISES_ANGLO},
+  {id:'rock-90s',      nombre:'🎵 Rock Clásico Anglo · 90s',   generos:['Rock'], decada:1990, paises:PAISES_ANGLO},
   {id:'espana-70s',    nombre:'🇪🇸 España · 70s', paises:['España'], decada:1970},
   {id:'espana-80s',    nombre:'🇪🇸 España · 80s', paises:['España'], decada:1980},
   {id:'espana-90s',    nombre:'🇪🇸 España · 90s', paises:['España'], decada:1990},
