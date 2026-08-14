@@ -1128,8 +1128,13 @@ const TEMAS = [
                         generos:['Reggae','Roots Reggae','Rocksteady','Dub'], paises:['Jamaica'], decada:1970},
   {id:'rock-es-60s',   nombre:'🇪🇸 Rock Español · 60s',
                         generos:['Rock','Garage Rock','Beat'], paises:['España'], decada:1960},
-  {id:'punk-77',       nombre:'🎸 Punk 77 (Rock, 73-80: Ramones, Clash...)',
-                        generos:['Rock'], añoDesde:1973, añoHasta:1980},
+  {id:'punk-77',       nombre:'🎸 Punk 77 (Ramones, Clash, Pistols...)',
+                        artistas:['Ramones','The Clash','Sex Pistols','Buzzcocks','The Damned',
+                                  'Sham 69','The Jam','Stiff Little Fingers','The Adverts','The Slits',
+                                  'Siouxsie and the Banshees','Wire','Patti Smith','Dead Boys',
+                                  'The Heartbreakers','The Stooges','MC5','New York Dolls',
+                                  'The Dictators','The Undertones','Iggy Pop','Angelic Upstarts',
+                                  'Radio Birdman']},
   {id:'rock-60s',      nombre:'🎵 Rock Clásico · 60s',   generos:['Rock'], decada:1960},
   {id:'rock-70s',      nombre:'🎵 Rock Clásico · 70s',   generos:['Rock'], decada:1970},
   {id:'rock-80s',      nombre:'🎵 Rock Clásico · 80s',   generos:['Rock'], decada:1980},
@@ -1174,7 +1179,9 @@ const TEMAS = [
   {id:'africa',         nombre:'🌍 África',
                         paises: PAISES_AFRICA},
   {id:'arabe',          nombre:'🕌 Música Árabe',
-                        paises: PAISES_ARABE}
+                        paises: PAISES_ARABE},
+  {id:'bso',            nombre:'🎬 Bandas Sonoras',
+                        generos:['Stage & Screen']}
 ];
 function pintarSelectorTemas(){
   const sel = $('sel-tema');
@@ -1220,6 +1227,12 @@ async function radioTema(id){
       const n = normalizar(e.artista + ' ' + e.album);
       return claves.every(c => n.includes(normalizar(c)));
     });
+  }
+  if(t.artistas){
+    // coincidencia solo contra el nombre del artista (no el álbum), para
+    // temas armados a partir de una lista curada de bandas concretas
+    const claves = t.artistas.map(a => normalizar(a));
+    candidatos = candidatos.filter(e => claves.some(c => normalizar(e.artista).includes(c)));
   }
   if(t.extra){
     candidatos = candidatos.filter(t.extra);
