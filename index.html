@@ -1111,6 +1111,10 @@ const PAISES_US = ['EE.UU.','EE','Arlington','Austin','Berkeley','Boston','Brook
   'Seattle','St. Louis','Waukegan','Yuma'];
 const PAISES_UK = ['Reino Unido','England','Scotland','Wales','Northern Ireland','London','Brighton',
   'Cambridge','Chester','Sheffield','Sunderland',"Bishop's Stortford",'Abingdon-on-Thames','Gedding'];
+const PAISES_AFRICA = ['Senegal','Mali','Malí','Ghana','Nigeria','Congo','Democratic Republic of the Congo',
+  'Camerún','Kenia','Benín','Burkina Faso','Cabo Verde','Costa de Marfil','Egipto','Etiopía','Gambia',
+  'Guinea','Marruecos','Sudáfrica','Túnez','Argelia','Dakar','Bamako','Abidjan','Algiers','Tunis'];
+const PAISES_ARABE = ['Marruecos','Argelia','Túnez','Egipto','Líbano','Algiers','Tunis'];
 
 /* temas para el radio: cada uno combina género, país y/o década.
    Para agregar uno nuevo, solo hace falta una línea más aquí — no hace
@@ -1156,7 +1160,21 @@ const TEMAS = [
                         generos:['Hip Hop'],
                         paises:['España', ...PAISES_LATINOAMERICA]},
   {id:'jazz-classic',  nombre:'🎺 Jazz Clásico · 40s-60s',
-                        generos:['Jazz'], añoDesde:1940, añoHasta:1969}
+                        generos:['Jazz'], añoDesde:1940, añoHasta:1969},
+  {id:'flamenco',       nombre:'💃 Flamenco',
+                        texto:'flamenco'},
+  {id:'flamenco-jazz',  nombre:'🎺 Flamenco Jazz',
+                        extra: e => {
+                          const n = normalizar(e.artista + ' ' + e.album);
+                          const genJazz = (e.generos||[]).some(g=>g.toLowerCase().includes('jazz'));
+                          return n.includes('flamenco') && (n.includes('jazz') || genJazz);
+                        }},
+  {id:'clasica',        nombre:'🎼 Música Clásica',
+                        generos:['Classical']},
+  {id:'africa',         nombre:'🌍 África',
+                        paises: PAISES_AFRICA},
+  {id:'arabe',          nombre:'🕌 Música Árabe',
+                        paises: PAISES_ARABE}
 ];
 function pintarSelectorTemas(){
   const sel = $('sel-tema');
@@ -1192,6 +1210,19 @@ async function radioTema(id){
       if(t.añoHasta && e.año > t.añoHasta) return false;
       return true;
     });
+  }
+  if(t.texto){
+    // busca la(s) palabra(s) en artista+álbum — útil cuando el género no
+    // alcanza a describir el estilo (p. ej. flamenco casi nunca está
+    // etiquetado como género propio en Discogs)
+    const claves = Array.isArray(t.texto) ? t.texto : [t.texto];
+    candidatos = candidatos.filter(e=>{
+      const n = normalizar(e.artista + ' ' + e.album);
+      return claves.every(c => n.includes(normalizar(c)));
+    });
+  }
+  if(t.extra){
+    candidatos = candidatos.filter(t.extra);
   }
   if(!candidatos.length){
     avisar('⚠ Sin discos para ese tema con los filtros que tienes activos ahora');
