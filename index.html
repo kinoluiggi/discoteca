@@ -1108,7 +1108,27 @@ const TEMAS = [
   {id:'reggae-ja-70s', nombre:'🇯🇲 Reggae Jamaicano · 70s',
                         generos:['Reggae','Roots Reggae','Rocksteady','Dub'], paises:['Jamaica'], decada:1970},
   {id:'rock-es-60s',   nombre:'🇪🇸 Rock Español · 60s',
-                        generos:['Rock','Garage Rock','Beat'], paises:['España'], decada:1960}
+                        generos:['Rock','Garage Rock','Beat'], paises:['España'], decada:1960},
+  {id:'punk-77',       nombre:'🎸 Punk 77 (Rock, 73-80: Ramones, Clash...)',
+                        generos:['Rock'], añoDesde:1973, añoHasta:1980},
+  {id:'rock-60s',      nombre:'🎵 Rock Clásico · 60s',   generos:['Rock'], decada:1960},
+  {id:'rock-70s',      nombre:'🎵 Rock Clásico · 70s',   generos:['Rock'], decada:1970},
+  {id:'rock-80s',      nombre:'🎵 Rock Clásico · 80s',   generos:['Rock'], decada:1980},
+  {id:'rock-90s',      nombre:'🎵 Rock Clásico · 90s',   generos:['Rock'], decada:1990},
+  {id:'espana-70s',    nombre:'🇪🇸 España · 70s', paises:['España'], decada:1970},
+  {id:'espana-80s',    nombre:'🇪🇸 España · 80s', paises:['España'], decada:1980},
+  {id:'espana-90s',    nombre:'🇪🇸 España · 90s', paises:['España'], decada:1990},
+  {id:'folk-mx',       nombre:'🇲🇽 Folk México', generos:['Folk'], paises:['México']},
+  {id:'electronica',   nombre:'🎛️ Electrónica', generos:['Electronic']},
+  {id:'reggae-latino', nombre:'🌎 Reggae Latino (España + Latinoamérica)',
+                        generos:['Reggae','Dub'],
+                        paises:['España','México','Colombia','Argentina','Chile','Perú','Uruguay','Venezuela',
+                                'Cuba','Brasil','República Dominicana','Puerto Rico','Ecuador','Bolivia',
+                                'Paraguay','Panamá','Costa Rica','Guatemala','Honduras','El Salvador','Nicaragua']},
+  {id:'africa-cuba',   nombre:'🌍 África · Cuba (Baobab, Star Band...)',
+                        paises:['Cuba','Senegal','Mali','Congo','Democratic Republic of the Congo','Ghana','Nigeria']},
+  {id:'mexico-90s',    nombre:'🇲🇽 México · 90s (Caifanes, Café Tacvba...)',
+                        paises:['México'], decada:1990, generos:['Rock']}
 ];
 function pintarSelectorTemas(){
   const sel = $('sel-tema');
@@ -1123,14 +1143,27 @@ async function radioTema(id){
   if(!t) return;
   let candidatos = visiblesAhora().filter(e=>e.v>0);  // respeta filtros ya activos, además de los del tema
   if(t.generos){
+    // coincidencia por substring: los géneros de Discogs suelen venir en
+    // cadenas compuestas ("Folk, World, & Country"), no siempre exactas
     const gs = t.generos.map(g=>g.toLowerCase());
-    candidatos = candidatos.filter(e=>(e.generos||[]).some(g=>gs.includes((g||'').toLowerCase())));
+    candidatos = candidatos.filter(e=>(e.generos||[]).some(g=>{
+      const gl = (g||'').toLowerCase();
+      return gs.some(clave => gl.includes(clave));
+    }));
   }
   if(t.paises){
     candidatos = candidatos.filter(e=> t.paises.includes(paisDe(e)));
   }
   if(t.decada){
     candidatos = candidatos.filter(e=> decadaDe(e.año) === t.decada);
+  }
+  if(t.añoDesde || t.añoHasta){
+    candidatos = candidatos.filter(e=>{
+      if(!e.año) return false;
+      if(t.añoDesde && e.año < t.añoDesde) return false;
+      if(t.añoHasta && e.año > t.añoHasta) return false;
+      return true;
+    });
   }
   if(!candidatos.length){
     avisar('⚠ Sin discos para ese tema con los filtros que tienes activos ahora');
