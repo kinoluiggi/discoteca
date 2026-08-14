@@ -1095,6 +1095,23 @@ function pintarColaUI(){
   if(act) act.scrollIntoView({block:'nearest'});
 }
 
+/* agrupaciones de país/ciudad reutilizables entre temas — tu catálogo
+   guarda a veces el país exacto ("España") y a veces la ciudad/región
+   ("Madrid", "Brooklyn", "London"), así que hay que cubrir ambas formas */
+const PAISES_LATINOAMERICA = ['México','Colombia','Argentina','Cuba','Perú','Chile','Venezuela',
+  'Brasil','República Dominicana','Rep. Dominicana','Puerto Rico','Uruguay','Ecuador','Bolivia',
+  'Paraguay','Panamá','Costa Rica','Guatemala','Honduras','El Salvador','Nicaragua',
+  'Buenos Aires','Bogotá','Caracas','Lima','Santiago','Montevideo','Rio de Janeiro','São Paulo',
+  'Ciudad de México','Ciudad Juárez','Tijuana','Oaxaca','Chiapas','Guerrero','Veracruz','La Habana',
+  'Cienfuegos','San Pedro','Belén de Escobar'];
+const PAISES_US = ['EE.UU.','EE','Arlington','Austin','Berkeley','Boston','Brooklyn','California',
+  'Chicago','Cincinnati','Clarksdale','Fullerton','Grand Rapids','Hoboken','Huntington Beach',
+  'Illinois','Los Angeles','Memphis','Mississippi','Nashville','New Orleans','New York','Omaha',
+  'Orange County','Phoenix','Portland','San Antonio','San Diego','San Francisco','San Jose',
+  'Seattle','St. Louis','Waukegan','Yuma'];
+const PAISES_UK = ['Reino Unido','England','Scotland','Wales','Northern Ireland','London','Brighton',
+  'Cambridge','Chester','Sheffield','Sunderland',"Bishop's Stortford",'Abingdon-on-Thames','Gedding'];
+
 /* temas para el radio: cada uno combina género, país y/o década.
    Para agregar uno nuevo, solo hace falta una línea más aquí — no hace
    falta tocar el HTML, el desplegable se llena solo con esta lista. */
@@ -1102,9 +1119,7 @@ const TEMAS = [
   {id:'alegre',   nombre:'☀️ Alegre',   generos:['Pop','Funk','Disco','Ska','Dancehall','Highlife','Soul','Soca']},
   {id:'sombria',  nombre:'🌙 Sombría',  generos:['Blues','Doom Metal','Ambient','Slowcore','Post-Rock','Drone','Dark Ambient','Gothic Rock']},
   {id:'baile',    nombre:'💃 Baile',    generos:['Disco','House','Funk','Reggaeton','Cumbia','Salsa','Dancehall','Afrobeat','Merengue']},
-  {id:'latino',   nombre:'🌎 Latino',   paises:['México','Colombia','Argentina','España','Cuba','Perú','Chile','Venezuela',
-                                                 'Brasil','República Dominicana','Puerto Rico','Uruguay','Ecuador','Bolivia',
-                                                 'Paraguay','Panamá','Costa Rica','Guatemala','Honduras','El Salvador','Nicaragua']},
+  {id:'latino',   nombre:'🌎 Latino',   paises:['España', ...PAISES_LATINOAMERICA]},
   {id:'reggae-ja-70s', nombre:'🇯🇲 Reggae Jamaicano · 70s',
                         generos:['Reggae','Roots Reggae','Rocksteady','Dub'], paises:['Jamaica'], decada:1970},
   {id:'rock-es-60s',   nombre:'🇪🇸 Rock Español · 60s',
@@ -1121,14 +1136,27 @@ const TEMAS = [
   {id:'folk-mx',       nombre:'🇲🇽 Folk México', generos:['Folk'], paises:['México']},
   {id:'electronica',   nombre:'🎛️ Electrónica', generos:['Electronic']},
   {id:'reggae-latino', nombre:'🌎 Reggae Latino (España + Latinoamérica)',
-                        generos:['Reggae','Dub'],
-                        paises:['España','México','Colombia','Argentina','Chile','Perú','Uruguay','Venezuela',
-                                'Cuba','Brasil','República Dominicana','Puerto Rico','Ecuador','Bolivia',
-                                'Paraguay','Panamá','Costa Rica','Guatemala','Honduras','El Salvador','Nicaragua']},
+                        generos:['Reggae','Dub'], paises:['España', ...PAISES_LATINOAMERICA]},
   {id:'africa-cuba',   nombre:'🌍 África · Cuba (Baobab, Star Band...)',
-                        paises:['Cuba','Senegal','Mali','Congo','Democratic Republic of the Congo','Ghana','Nigeria']},
+                        paises:['Cuba','Senegal','Mali','Congo','Democratic Republic of the Congo','Ghana','Nigeria','Dakar','Bamako']},
   {id:'mexico-90s',    nombre:'🇲🇽 México · 90s (Caifanes, Café Tacvba...)',
-                        paises:['México'], decada:1990, generos:['Rock']}
+                        paises:['México'], decada:1990, generos:['Rock']},
+  {id:'blues-classic', nombre:'🎷 Classic Blues · 30s-60s',
+                        generos:['Blues'], añoDesde:1930, añoHasta:1969},
+  {id:'soul-classic',  nombre:'🎤 Classic Soul · 60s-70s',
+                        generos:['Soul'], añoDesde:1960, añoHasta:1979},
+  {id:'soul-new',      nombre:'🎤 New Soul (2000+)',
+                        generos:['Soul'], añoDesde:2000},
+  {id:'rnb-classic',   nombre:'🎹 Rhythm & Blues · 40s-60s',
+                        generos:['Blues','Soul'], añoDesde:1940, añoHasta:1969},
+  {id:'hiphop-us-uk-za', nombre:'🎧 Hip Hop (US, UK, Sudáfrica)',
+                        generos:['Hip Hop'],
+                        paises:[...PAISES_US, ...PAISES_UK, 'Sudáfrica']},
+  {id:'hiphop-latino', nombre:'🎧 Latin Hip Hop (España + Latinoamérica)',
+                        generos:['Hip Hop'],
+                        paises:['España', ...PAISES_LATINOAMERICA]},
+  {id:'jazz-classic',  nombre:'🎺 Jazz Clásico · 40s-60s',
+                        generos:['Jazz'], añoDesde:1940, añoHasta:1969}
 ];
 function pintarSelectorTemas(){
   const sel = $('sel-tema');
