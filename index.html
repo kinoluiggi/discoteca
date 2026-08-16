@@ -3246,7 +3246,8 @@ function pintarPlaylists(){
       p.tracks.slice(0, 5).forEach(t=>{
         const it = document.createElement('div');
         it.className = 'lf-item';
-        it.innerHTML = `<div class="lf-ph"></div>
+        const img = t.videoId ? `https://i.ytimg.com/vi/${t.videoId}/mqdefault.jpg` : null;
+        it.innerHTML = `${img ? `<img src="${img}" alt="">` : '<div class="lf-ph"></div>'}
           <div><b>${t.titulo||''}</b><span>${t.artista||''}</span></div>`;
         lista.appendChild(it);
       });
