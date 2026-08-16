@@ -503,6 +503,7 @@ input[type=range]::-moz-range-thumb{
 <div id="vista-playlists" style="display:none">
   <div class="controles">
     <button class="btn-azar" onclick="crearPlaylist()">➕ NUEVA PLAYLIST</button>
+    <button class="btn-azar" onclick="importarPlaylistYouTube()">📥 IMPORTAR DE YOUTUBE</button>
     <div class="contador" id="playlists-status"></div>
   </div>
   <div id="playlists-lista" class="lf-cols"></div>
@@ -1139,6 +1140,11 @@ const TEMAS = [
                                   'The Heartbreakers','The Stooges','MC5','New York Dolls',
                                   'The Dictators','The Undertones','Iggy Pop','Angelic Upstarts',
                                   'Radio Birdman']},
+  {id:'beatles',       nombre:'🪲 The Beatles',
+                        artistas:['The Beatles']},
+  {id:'elephant6',     nombre:'🐘 Elephant 6 (NMH, Apples in Stereo...)',
+                        artistas:['Neutral Milk Hotel','The Apples in Stereo','The Olivia Tremor Control',
+                                  'of Montreal','Elf Power','Beulah','The Music Tapes','Circulatory System']},
   {id:'rock-60s',      nombre:'🎵 Rock Clásico Anglo · 60s',   generos:['Rock'], decada:1960, paises:PAISES_ANGLO},
   {id:'rock-70s',      nombre:'🎵 Rock Clásico Anglo · 70s',   generos:['Rock'], decada:1970, paises:PAISES_ANGLO},
   {id:'rock-80s',      nombre:'🎵 Rock Clásico Anglo · 80s',   generos:['Rock'], decada:1980, paises:PAISES_ANGLO},
@@ -3083,6 +3089,67 @@ async function crearPlaylist(){
   guardarPlaylists(pl);
   pintarPlaylists();
   return id;
+}
+function extraerIdPlaylistYouTube(url){
+  const m = url.match(/[?&]list=([\w-]+)/);
+  return m ? m[1] : (/^[\w-]{10,}$/.test(url.trim()) ? url.trim() : null);
+}
+async function importarPlaylistYouTube(){
+  const resp = await dialogo({
+    titulo: '📥 IMPORTAR PLAYLIST DE YOUTUBE',
+    mensaje: 'Pega el link de una playlist pública de YouTube\n' +
+      '(tiene que traer "list=..." en la URL).',
+    valor: ''});
+  if(resp === null || !resp.trim()) return;
+  const idYt = extraerIdPlaylistYouTube(resp.trim());
+  if(!idYt){ avisar('⚠ No reconozco esa URL como playlist de YouTube'); return; }
+
+  avisar('📥 Importando playlist...');
+  try{
+    // nombre real de la playlist en YouTube
+    let nombrePlaylist = 'Playlist de YouTube';
+    try{
+      const rMeta = await fetch(`https://www.googleapis.com/youtube/v3/playlists` +
+        `?part=snippet&id=${idYt}&key=${CONFIG.YOUTUBE_API_KEY}`);
+      const dMeta = await rMeta.json();
+      if(dMeta.items && dMeta.items[0]) nombrePlaylist = dMeta.items[0].snippet.title;
+    }catch(_){}
+
+    // traer todas las pistas, paginando de 50 en 50 (1 unidad de cuota cada página)
+    const tracks = [];
+    let pageToken = '';
+    do{
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems` +
+        `?part=snippet,contentDetails&maxResults=50&playlistId=${idYt}` +
+        `&pageToken=${pageToken}&key=${CONFIG.YOUTUBE_API_KEY}`);
+      const d = await r.json();
+      if(d.error){
+        avisar('⚠ Error de YouTube: ' + (d.error.message || d.error.code));
+        return;
+      }
+      (d.items || []).forEach(it=>{
+        const vid = it.contentDetails && it.contentDetails.videoId;
+        const titulo = it.snippet && it.snippet.title;
+        if(!vid || !titulo || titulo === 'Deleted video' || titulo === 'Private video') return;
+        tracks.push({
+          artista: (it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || '').trim(),
+          titulo: titulo, duracion: null, videoId: vid, fuente: 'import-yt'
+        });
+      });
+      pageToken = d.nextPageToken || '';
+    }while(pageToken);
+
+    if(!tracks.length){ avisar('⚠ Esa playlist no trajo ninguna pista importable'); return; }
+
+    const pl = leerPlaylists();
+    const id = 'pl_' + Date.now();
+    pl[id] = {nombre: nombrePlaylist, creada: new Date().toISOString(), tracks};
+    guardarPlaylists(pl);
+    pintarPlaylists();
+    avisar(`✓ Importadas ${tracks.length} pistas de "${nombrePlaylist}"`);
+  }catch(e){
+    avisar('⚠ Error importando la playlist: ' + e.message);
+  }
 }
 /* pista "portátil": guarda todo lo que hace falta para reproducirla suelta,
    sin depender de que el álbum de origen siga abierto */
