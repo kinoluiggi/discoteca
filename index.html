@@ -3094,6 +3094,24 @@ function extraerIdPlaylistYouTube(url){
   const m = url.match(/[?&]list=([\w-]+)/);
   return m ? m[1] : (/^[\w-]{10,}$/.test(url.trim()) ? url.trim() : null);
 }
+/* limpia lo que trae YouTube en canal/título antes de guardarlo, para que
+   el scrobbling a Last.fm no cree artistas duplicados por culpa de canales
+   tipo "Xavi - Topic" o títulos con "(Official Video)" pegado */
+function limpiarArtistaYouTube(canalCrudo){
+  return (canalCrudo || '').trim()
+    .replace(/\s*-\s*Topic$/i, '')
+    .replace(/VEVO$/i, '')
+    .trim();
+}
+function limpiarTituloYouTube(tituloCrudo){
+  return (tituloCrudo || '')
+    .replace(/[\(\[]\s*official\s*(music\s*)?video\s*[\)\]]/gi, '')
+    .replace(/[\(\[]\s*official\s*(audio|lyric|lyrics)\s*(video)?\s*[\)\]]/gi, '')
+    .replace(/[\(\[]\s*(audio|lyric video|lyrics|visualizer|video oficial|video lyric)\s*[\)\]]/gi, '')
+    .replace(/\(\s*\)|\[\s*\]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 async function importarPlaylistYouTube(){
   const resp = await dialogo({
     titulo: '📥 IMPORTAR PLAYLIST DE YOUTUBE',
@@ -3129,11 +3147,13 @@ async function importarPlaylistYouTube(){
       }
       (d.items || []).forEach(it=>{
         const vid = it.contentDetails && it.contentDetails.videoId;
-        const titulo = it.snippet && it.snippet.title;
-        if(!vid || !titulo || titulo === 'Deleted video' || titulo === 'Private video') return;
+        const tituloCrudo = it.snippet && it.snippet.title;
+        if(!vid || !tituloCrudo || tituloCrudo === 'Deleted video' || tituloCrudo === 'Private video') return;
+        const canalCrudo = it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || '';
         tracks.push({
-          artista: (it.snippet.videoOwnerChannelTitle || it.snippet.channelTitle || '').trim(),
-          titulo: titulo, duracion: null, videoId: vid, fuente: 'import-yt'
+          artista: limpiarArtistaYouTube(canalCrudo),
+          titulo: limpiarTituloYouTube(tituloCrudo),
+          duracion: null, videoId: vid, fuente: 'import-yt'
         });
       });
       pageToken = d.nextPageToken || '';
