@@ -504,6 +504,7 @@ input[type=range]::-moz-range-thumb{
   <div class="controles">
     <button class="btn-azar" onclick="crearPlaylist()">➕ NUEVA PLAYLIST</button>
     <button class="btn-azar" onclick="importarPlaylistYouTube()">📥 IMPORTAR DE YOUTUBE</button>
+    <button class="btn-azar" onclick="importarCSVPlaylist()">📄 IMPORTAR CSV</button>
     <div class="contador" id="playlists-status"></div>
   </div>
   <div id="playlists-lista" class="lf-cols"></div>
@@ -650,11 +651,43 @@ async function cargarIndice(){
 }
 
 // país efectivo de una entrada: del artista si hay mapa, si no de la edición
+/* el catálogo se importó originalmente con nombres de país en inglés
+   (de Discogs), pero la tabla de artistas y los temas usan español —
+   esto normaliza ambos a un mismo idioma para que coincidan */
+const NORMALIZAR_PAIS = {
+  'spain':'España', 'us':'Estados Unidos', 'usa':'Estados Unidos', 'united states':'Estados Unidos',
+  'usa & canada':'Estados Unidos', 'uk':'Reino Unido', 'united kingdom':'Reino Unido',
+  'uk & europe':'Reino Unido', 'europe':'Europa', 'mexico':'México', 'france':'Francia',
+  'germany':'Alemania', 'japan':'Japón', 'brazil':'Brasil', 'canada':'Canadá', 'italy':'Italia',
+  'netherlands':'Países Bajos', 'peru':'Perú', 'russia':'Rusia', 'worldwide':'Internacional',
+  'greece':'Grecia', 'taiwan':'Taiwán', 'south africa':'Sudáfrica', 'belgium':'Bélgica',
+  'sweden':'Suecia', 'south korea':'Corea del Sur', 'luxembourg':'Luxemburgo',
+  'new zealand':'Nueva Zelanda', 'switzerland':'Suiza', 'poland':'Polonia', 'denmark':'Dinamarca',
+  'ireland':'Irlanda', 'austria':'Austria', 'norway':'Noruega', 'finland':'Finlandia',
+  'czech republic':'República Checa', 'czechoslovakia':'Checoslovaquia', 'hungary':'Hungría',
+  'israel':'Israel', 'india':'India', 'china':'China', 'thailand':'Tailandia',
+  'philippines':'Filipinas', 'egypt':'Egipto', 'morocco':'Marruecos', 'algeria':'Argelia',
+  'tunisia':'Túnez', 'lebanon':'Líbano', 'turkey':'Turquía', 'dominican republic':'República Dominicana',
+  'puerto rico':'Puerto Rico', 'nigeria':'Nigeria', 'ghana':'Ghana', 'mali':'Malí',
+  'congo':'Congo', 'kenya':'Kenia', 'ethiopia':'Etiopía'
+};
+function normalizarPais(p){
+  if(!p) return p;
+  return NORMALIZAR_PAIS[p.trim().toLowerCase()] || p;
+}
+function paisesDe(e){
+  // lo que se corrige a mano en la ficha de un álbum concreto manda siempre
+  // sobre la tabla masiva por artista, que es solo un valor por defecto.
+  // Puede traer varios países separados por coma ("España, México").
+  const crudo = e.pais || (PAISES_ARTISTA ? PAISES_ARTISTA[normalizar(e.artista||'')] : null);
+  if(!crudo) return [];
+  return crudo.split(',').map(p=>normalizarPais(p.trim())).filter(Boolean);
+}
+/* compatibilidad: cuando solo hace falta "el" país (mostrarlo en pantalla,
+   contar para el selector), se usa el primero de la lista */
 function paisDe(e){
-  if(PAISES_ARTISTA){
-    return PAISES_ARTISTA[normalizar(e.artista||'')] || null;
-  }
-  return e.pais;
+  const ps = paisesDe(e);
+  return ps.length ? ps[0] : null;
 }
 async function cargarAlbum(entrada){
   if(MODO_REMOTO){
@@ -700,8 +733,7 @@ function pintarSelectores(){
   const cuentaG = {}, cuentaP = {};
   INDICE.forEach(e=>{
     (e.generos||[]).forEach(g=> cuentaG[g]=(cuentaG[g]||0)+1);
-    const p = paisDe(e);
-    if(p) cuentaP[p]=(cuentaP[p]||0)+1;
+    paisesDe(e).forEach(p=> cuentaP[p]=(cuentaP[p]||0)+1);
   });
   const selG = $('sel-genero'), selP = $('sel-pais');
   selP.options[0].textContent = PAISES_ARTISTA
@@ -732,7 +764,7 @@ function visiblesAhora(){
   return INDICE.filter(e=>{
     if(filtroDecada && decadaDe(e.año)!==filtroDecada) return false;
     if(filtroGenero && !(e.generos||[]).includes(filtroGenero)) return false;
-    if(filtroPais && paisDe(e) !== filtroPais) return false;
+    if(filtroPais && !paisesDe(e).includes(filtroPais)) return false;
     if(q && !normalizar(e.artista+' '+e.album).includes(q)) return false;
     return true;
   });
@@ -1215,7 +1247,7 @@ async function radioTema(id){
     }));
   }
   if(t.paises){
-    candidatos = candidatos.filter(e=> t.paises.includes(paisDe(e)));
+    candidatos = candidatos.filter(e=> paisesDe(e).some(p=>t.paises.includes(p)));
   }
   if(t.decada){
     candidatos = candidatos.filter(e=> decadaDe(e.año) === t.decada);
@@ -2416,7 +2448,7 @@ async function resolverPistaLastfm(i, reproducir){
 
 /* una pista de Last.fm lista para el reproductor (aún sin videoId) */
 function pistaLF(artista, cancion, num){
-  return {num, titulo: `${artista} — ${cancion}`, duracion: null, videoId: null,
+  return {num, titulo: cancion, artista: artista || undefined, duracion: null, videoId: null,
            _lf: true, _artista: artista, _cancion: cancion};
 }
 /* abre cualquier lista de pistas de Last.fm en el reproductor grande */
@@ -3090,6 +3122,64 @@ async function crearPlaylist(){
   pintarPlaylists();
   return id;
 }
+/* parser mínimo de una línea CSV con campos entre comillas (soporta comas
+   y comillas escapadas "" dentro del campo, como exportan Soulseek/Plex) */
+function parsearLineaCSV(linea){
+  const campos = [];
+  let actual = '', dentro = false;
+  for(let i=0;i<linea.length;i++){
+    const c = linea[i];
+    if(dentro){
+      if(c === '"'){
+        if(linea[i+1] === '"'){ actual += '"'; i++; }
+        else dentro = false;
+      }else actual += c;
+    }else{
+      if(c === '"') dentro = true;
+      else if(c === ','){ campos.push(actual); actual = ''; }
+      else actual += c;
+    }
+  }
+  campos.push(actual);
+  return campos;
+}
+async function importarCSVPlaylist(){
+  const bloque = await dialogo({
+    titulo: '📄 IMPORTAR CSV',
+    mensaje: 'Pega el CSV con columnas "SongName","ArtistName","AlbumName"\n' +
+      '(el que exportan Soulseek/Plex). El encabezado, si lo trae, se ignora solo.\n' +
+      'Cada canción se busca en YouTube solo cuando le des play, no todas de un jalón.',
+    valor: '', textarea: true});
+  if(bloque === null || !bloque.trim()) return;
+  const lineas = bloque.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lineas.length) return;
+  let inicio = 0;
+  if(/songname/i.test(lineas[0]) || /artistname/i.test(lineas[0])) inicio = 1;
+
+  const nombrePlaylist = await dialogo({
+    titulo: '✎ NOMBRE DE LA PLAYLIST',
+    mensaje: '',
+    valor: 'Importada de CSV'});
+  if(nombrePlaylist === null) return;
+
+  const tracks = [];
+  for(let i = inicio; i < lineas.length; i++){
+    const campos = parsearLineaCSV(lineas[i]);
+    const cancion = (campos[0] || '').trim();
+    const artista = (campos[1] || '').trim();
+    if(!cancion) continue;
+    tracks.push(pistaLF(artista, cancion, tracks.length + 1));
+  }
+  if(!tracks.length){ avisar('⚠ No encontré filas válidas en ese CSV'); return; }
+
+  const pl = leerPlaylists();
+  const id = 'pl_' + Date.now();
+  pl[id] = {nombre: nombrePlaylist.trim() || 'Importada de CSV',
+            creada: new Date().toISOString(), tracks};
+  guardarPlaylists(pl);
+  pintarPlaylists();
+  avisar(`✓ Importadas ${tracks.length} pistas · se buscan en YouTube al reproducirlas`);
+}
 function extraerIdPlaylistYouTube(url){
   const m = url.match(/[?&]list=([\w-]+)/);
   return m ? m[1] : (/^[\w-]{10,}$/.test(url.trim()) ? url.trim() : null);
@@ -3511,7 +3601,7 @@ document.addEventListener('keydown', ev=>{
     <label>ESTILOS (separados por coma)</label>
     <input id="ficha-estilos" type="text" autocomplete="off" placeholder="Flamenco, Rumba">
     <label>PAÍS (EDICIÓN)</label>
-    <input id="ficha-pais" type="text" autocomplete="off" placeholder="Spain">
+    <input id="ficha-pais" type="text" autocomplete="off" placeholder="España">
     <div class="ficha-botones">
       <button class="ficha-no" onclick="cerrarFicha(false)">CANCELAR</button>
       <button class="ficha-ok" onclick="cerrarFicha(true)">APLICAR</button>
