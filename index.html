@@ -1209,7 +1209,11 @@ const TEMAS = [
   {id:'jazz-classic',  nombre:'🎺 Jazz Clásico · 40s-60s',
                         generos:['Jazz'], añoDesde:1940, añoHasta:1969},
   {id:'flamenco',       nombre:'💃 Flamenco',
-                        texto:'flamenco'},
+                        extra: e => {
+                          const n = normalizar(e.artista + ' ' + e.album);
+                          const genFlamenco = (e.generos||[]).some(g=>g.toLowerCase().includes('flamenco'));
+                          return genFlamenco || n.includes('flamenco');
+                        }},
   {id:'flamenco-jazz',  nombre:'🎺 Flamenco Jazz',
                         extra: e => {
                           const n = normalizar(e.artista + ' ' + e.album);
