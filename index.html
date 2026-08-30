@@ -376,6 +376,14 @@ input[type=range]::-moz-range-thumb{
     </select>
     <button class="btn-azar" id="btn-nuevo-album" style="display:none">➕ NUEVO ÁLBUM</button>
     <div class="contador" id="contador"></div>
+    <select class="selector" id="sel-orden" onchange="cambiarOrden(this.value)">
+      <option value="alfabetico">ORDENAR: A-Z</option>
+      <option value="anio-desc">ORDENAR: AÑO ↓ (nuevo primero)</option>
+      <option value="anio-asc">ORDENAR: AÑO ↑ (viejo primero)</option>
+      <option value="aleatorio">ORDENAR: 🔀 ALEATORIO</option>
+    </select>
+    <button class="btn-azar" id="btn-remezclar" style="display:none"
+            onclick="generarOrdenAleatorio(); pintarGrid();">🔀 REMEZCLAR</button>
   </div>
   <div class="grid" id="grid"></div>
 </div>
@@ -759,6 +767,29 @@ function pintarSelectores(){
     selP.onchange = ()=>{ filtroPais=selP.value; pintarGrid(); };
   }
 }
+let ordenActual = 'alfabetico', ordenAleatorioMapa = null;
+function generarOrdenAleatorio(){
+  ordenAleatorioMapa = new Map();
+  INDICE.forEach(e => ordenAleatorioMapa.set(e.id, Math.random()));
+}
+function cambiarOrden(v){
+  ordenActual = v;
+  $('btn-remezclar').style.display = (v === 'aleatorio') ? '' : 'none';
+  if(v === 'aleatorio' && !ordenAleatorioMapa) generarOrdenAleatorio();
+  pintarGrid();
+}
+function ordenarVisibles(lista){
+  const arr = [...lista];
+  if(ordenActual === 'anio-desc') arr.sort((a,b)=>(b.año||0)-(a.año||0));
+  else if(ordenActual === 'anio-asc') arr.sort((a,b)=>(a.año||0)-(b.año||0));
+  else if(ordenActual === 'aleatorio'){
+    if(!ordenAleatorioMapa) generarOrdenAleatorio();
+    arr.sort((a,b)=>(ordenAleatorioMapa.get(a.id)||0)-(ordenAleatorioMapa.get(b.id)||0));
+  }else{
+    arr.sort((a,b)=>(a.artista||'').localeCompare(b.artista||'', 'es'));
+  }
+  return arr;
+}
 function visiblesAhora(){
   const q = normalizar(filtroTexto);
   return INDICE.filter(e=>{
@@ -770,7 +801,7 @@ function visiblesAhora(){
   });
 }
 function pintarGrid(){
-  const visibles = visiblesAhora();
+  const visibles = ordenarVisibles(visiblesAhora());
   $('contador').textContent = `${visibles.length} ÁLBUMES`;
   const grid = $('grid');
   grid.innerHTML = '';
