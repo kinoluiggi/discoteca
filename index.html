@@ -510,9 +510,9 @@ input[type=range]::-moz-range-thumb{
 <!-- ================= VISTA PLAYLISTS ================= -->
 <div id="vista-playlists" style="display:none">
   <div class="controles">
-    <button class="btn-azar" onclick="crearPlaylist()">➕ NUEVA PLAYLIST</button>
-    <button class="btn-azar" onclick="importarPlaylistYouTube()">📥 IMPORTAR DE YOUTUBE</button>
-    <button class="btn-azar" onclick="importarCSVPlaylist()">📄 IMPORTAR CSV</button>
+    <button class="btn-azar" id="btn-nueva-playlist" style="display:none" onclick="crearPlaylist()">➕ NUEVA PLAYLIST</button>
+    <button class="btn-azar" id="btn-import-yt-playlist" style="display:none" onclick="importarPlaylistYouTube()">📥 IMPORTAR DE YOUTUBE</button>
+    <button class="btn-azar" id="btn-import-csv-playlist" style="display:none" onclick="importarCSVPlaylist()">📄 IMPORTAR CSV</button>
     <div class="contador" id="playlists-status"></div>
   </div>
   <div id="playlists-lista" class="lf-cols"></div>
@@ -1080,14 +1080,14 @@ function pintarAlbumUI(){
       lapiz.onclick=ev=>{ ev.stopPropagation(); editarPista(i); };
       div.appendChild(busca); div.appendChild(lapiz);
     }
-    if(reproducible(t)){
+    if(MODO_EDITAR && reproducible(t)){
       const add=document.createElement('button');
       add.textContent='➕'; add.title='Añadir a una playlist';
       add.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:12px;padding:0 3px';
       add.onclick=ev=>{ ev.stopPropagation(); elegirPlaylist(t); };
       div.appendChild(add);
     }
-    if(ALBUM._playlist){
+    if(MODO_EDITAR && ALBUM._playlist){
       const quita=document.createElement('button');
       quita.textContent='✕'; quita.title='Quitar de esta playlist';
       quita.style.cssText='background:none;border:none;color:var(--texto-tenue);cursor:pointer;font-size:11px;padding:0 3px';
@@ -1111,7 +1111,7 @@ function irTab(t){
   if(t==='vinilos') initVinilos();
   if(t==='lastfm') initLastfm();
   if(t==='novedades') initNovedades();
-  if(t==='playlists') pintarPlaylists();
+  if(t==='playlists') initPlaylists();
 }
 
 let scrollGuardado = 0;
@@ -3138,24 +3138,62 @@ async function guardarNovedades(){
 }
 
 /* ====================== PLAYLISTS (localStorage, por navegador) ====================== */
-function leerPlaylists(){
-  try{ return JSON.parse(localStorage.getItem('playlists') || '{}'); }catch(_){ return {}; }
+let PLAYLISTS = {}, playlistsCargadas = false;
+async function initPlaylists(){
+  if(playlistsCargadas){ pintarPlaylists(); return; }
+  playlistsCargadas = true;
+  try{
+    const r = await fetch(BASE + 'playlists.json?t=' + Date.now());
+    PLAYLISTS = r.ok ? await r.json() : {};
+  }catch(_){ PLAYLISTS = {}; }
+  pintarPlaylists();
 }
-function guardarPlaylists(pl){
-  try{ localStorage.setItem('playlists', JSON.stringify(pl)); }catch(_){}
+/* lee lo último de playlists.json, deja que `transformar` lo modifique en
+   sitio, y lo guarda — con el mismo patrón seguro de reintento del resto
+   del curador. `transformar` devuelve null para cancelar sin guardar. */
+async function conPlaylistsGitHub(mensaje, transformar){
+  const token = await pedirToken();
+  if(!token) return false;
+  const ruta = BASE + 'playlists.json';
+  const api = `https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${ruta}`;
+  const cab = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'};
+  let ok = false, ultimoError = '';
+  for(let intento = 1; intento <= 3 && !ok; intento++){
+    try{
+      const {datos, sha} = await leerJSONRepoGitHub(ruta, cab, 'playlists.json');
+      const actuales = datos || {};
+      if(transformar(actuales) === null) return false;
+      const cuerpo = {message: mensaje, content: utoa(JSON.stringify(actuales)), branch: 'main'};
+      if(sha) cuerpo.sha = sha;
+      const r2 = await fetch(api, {method: 'PUT', headers: cab, body: JSON.stringify(cuerpo)});
+      if(r2.status === 409){ ultimoError = '409 (conflicto)'; await new Promise(res=>setTimeout(res,2500)); continue; }
+      if(!r2.ok) throw new Error('guardando playlists: ' + r2.status);
+      PLAYLISTS = actuales;
+      ok = true;
+    }catch(e){
+      ultimoError = e.message;
+      if(String(e).includes('401')){ localStorage.removeItem('gh_token'); break; }
+      await new Promise(res => setTimeout(res, 2000));
+    }
+  }
+  if(!ok) avisar('⚠ Error tras 3 intentos: ' + ultimoError);
+  return ok;
 }
 async function crearPlaylist(){
+  if(!MODO_EDITAR) return null;
   const nombre = await dialogo({
     titulo: '➕ NUEVA PLAYLIST',
     mensaje: 'Nombre de la playlist.',
     valor: ''});
   if(nombre === null || !nombre.trim()) return null;
-  const pl = leerPlaylists();
-  const id = 'pl_' + Date.now();
-  pl[id] = {nombre: nombre.trim(), creada: new Date().toISOString(), tracks: []};
-  guardarPlaylists(pl);
-  pintarPlaylists();
-  return id;
+  let idNueva = null;
+  const ok = await conPlaylistsGitHub(`curador: nueva playlist "${nombre.trim()}"`, (pl)=>{
+    idNueva = 'pl_' + Date.now();
+    pl[idNueva] = {nombre: nombre.trim(), creada: new Date().toISOString(), tracks: []};
+    return pl;
+  });
+  if(ok){ pintarPlaylists(); avisar('✓ Playlist creada'); }
+  return ok ? idNueva : null;
 }
 /* parser mínimo de una línea CSV con campos entre comillas (soporta comas
    y comillas escapadas "" dentro del campo, como exportan Soulseek/Plex) */
@@ -3179,6 +3217,7 @@ function parsearLineaCSV(linea){
   return campos;
 }
 async function importarCSVPlaylist(){
+  if(!MODO_EDITAR) return;
   const bloque = await dialogo({
     titulo: '📄 IMPORTAR CSV',
     mensaje: 'Pega el CSV con columnas "SongName","ArtistName","AlbumName"\n' +
@@ -3207,13 +3246,16 @@ async function importarCSVPlaylist(){
   }
   if(!tracks.length){ avisar('⚠ No encontré filas válidas en ese CSV'); return; }
 
-  const pl = leerPlaylists();
-  const id = 'pl_' + Date.now();
-  pl[id] = {nombre: nombrePlaylist.trim() || 'Importada de CSV',
-            creada: new Date().toISOString(), tracks};
-  guardarPlaylists(pl);
-  pintarPlaylists();
-  avisar(`✓ Importadas ${tracks.length} pistas · se buscan en YouTube al reproducirlas`);
+  const ok = await conPlaylistsGitHub(`curador: importar CSV "${nombrePlaylist.trim()}"`, (pl)=>{
+    const id = 'pl_' + Date.now();
+    pl[id] = {nombre: nombrePlaylist.trim() || 'Importada de CSV',
+              creada: new Date().toISOString(), tracks};
+    return pl;
+  });
+  if(ok){
+    pintarPlaylists();
+    avisar(`✓ Importadas ${tracks.length} pistas · se buscan en YouTube al reproducirlas`);
+  }
 }
 function extraerIdPlaylistYouTube(url){
   const m = url.match(/[?&]list=([\w-]+)/);
@@ -3238,6 +3280,7 @@ function limpiarTituloYouTube(tituloCrudo){
     .trim();
 }
 async function importarPlaylistYouTube(){
+  if(!MODO_EDITAR) return;
   const resp = await dialogo({
     titulo: '📥 IMPORTAR PLAYLIST DE YOUTUBE',
     mensaje: 'Pega el link de una playlist pública de YouTube\n' +
@@ -3249,7 +3292,6 @@ async function importarPlaylistYouTube(){
 
   avisar('📥 Importando playlist...');
   try{
-    // nombre real de la playlist en YouTube
     let nombrePlaylist = 'Playlist de YouTube';
     try{
       const rMeta = await fetch(`https://www.googleapis.com/youtube/v3/playlists` +
@@ -3258,7 +3300,6 @@ async function importarPlaylistYouTube(){
       if(dMeta.items && dMeta.items[0]) nombrePlaylist = dMeta.items[0].snippet.title;
     }catch(_){}
 
-    // traer todas las pistas, paginando de 50 en 50 (1 unidad de cuota cada página)
     const tracks = [];
     let pageToken = '';
     do{
@@ -3286,12 +3327,15 @@ async function importarPlaylistYouTube(){
 
     if(!tracks.length){ avisar('⚠ Esa playlist no trajo ninguna pista importable'); return; }
 
-    const pl = leerPlaylists();
-    const id = 'pl_' + Date.now();
-    pl[id] = {nombre: nombrePlaylist, creada: new Date().toISOString(), tracks};
-    guardarPlaylists(pl);
-    pintarPlaylists();
-    avisar(`✓ Importadas ${tracks.length} pistas de "${nombrePlaylist}"`);
+    const ok = await conPlaylistsGitHub(`curador: importar YouTube "${nombrePlaylist}"`, (pl)=>{
+      const id = 'pl_' + Date.now();
+      pl[id] = {nombre: nombrePlaylist, creada: new Date().toISOString(), tracks};
+      return pl;
+    });
+    if(ok){
+      pintarPlaylists();
+      avisar(`✓ Importadas ${tracks.length} pistas de "${nombrePlaylist}"`);
+    }
   }catch(e){
     avisar('⚠ Error importando la playlist: ' + e.message);
   }
@@ -3307,9 +3351,16 @@ function pistaPortatil(t, contexto){
   };
 }
 async function elegirPlaylist(t){
-  const pl = leerPlaylists();
-  const ids = Object.keys(pl);
-  let opciones = ids.map((id,i)=>`${i+1}. ${pl[id].nombre} (${pl[id].tracks.length})`).join('\n');
+  if(!MODO_EDITAR) return;
+  if(!playlistsCargadas){
+    try{
+      const r = await fetch(BASE + 'playlists.json?t=' + Date.now());
+      PLAYLISTS = r.ok ? await r.json() : {};
+    }catch(_){ PLAYLISTS = {}; }
+    playlistsCargadas = true;
+  }
+  const ids = Object.keys(PLAYLISTS);
+  const opciones = ids.map((id,i)=>`${i+1}. ${PLAYLISTS[id].nombre} (${PLAYLISTS[id].tracks.length})`).join('\n');
   const resp = await dialogo({
     titulo: '➕ AÑADIR A PLAYLIST',
     mensaje: (ids.length ? `Escribe el número de la playlist:\n${opciones}\n\n` : '') +
@@ -3317,56 +3368,74 @@ async function elegirPlaylist(t){
     valor: ''});
   if(resp === null || !resp.trim()) return;
   const texto = resp.trim();
-  let id;
   const n = parseInt(texto, 10);
-  if(!isNaN(n) && n >= 1 && n <= ids.length){
-    id = ids[n-1];
-  }else{
-    id = 'pl_' + Date.now();
-    pl[id] = {nombre: texto, creada: new Date().toISOString(), tracks: []};
+  const idElegido = (!isNaN(n) && n >= 1 && n <= ids.length) ? ids[n-1] : null;
+  const pista = pistaPortatil(t, ALBUM);
+  let nombreFinal = '';
+  const ok = await conPlaylistsGitHub('curador: añadir pista a playlist', (pl)=>{
+    let id = idElegido;
+    if(id && pl[id]){
+      pl[id].tracks.push(pista);
+      nombreFinal = pl[id].nombre;
+    }else{
+      id = idElegido || ('pl_' + Date.now());
+      pl[id] = {nombre: texto, creada: new Date().toISOString(), tracks: [pista]};
+      nombreFinal = pl[id].nombre;
+    }
+    return pl;
+  });
+  if(ok){
+    avisar(`✓ Añadida a "${nombreFinal}"`);
+    if(TAB === 'playlists') pintarPlaylists();
   }
-  pl[id].tracks.push(pistaPortatil(t, ALBUM));
-  guardarPlaylists(pl);
-  avisar(`✓ Añadida a "${pl[id].nombre}"`);
-  if(TAB === 'playlists') pintarPlaylists();
 }
-function quitarDePlaylist(id, i){
-  const pl = leerPlaylists();
-  if(!pl[id]) return;
-  pl[id].tracks.splice(i, 1);
-  guardarPlaylists(pl);
-  abrirPlaylist(id);
+async function quitarDePlaylist(id, i){
+  if(!MODO_EDITAR) return;
+  const ok = await conPlaylistsGitHub('curador: quitar pista de playlist', (pl)=>{
+    if(!pl[id]) return null;
+    pl[id].tracks.splice(i, 1);
+    return pl;
+  });
+  if(ok) abrirPlaylist(id);
 }
 async function eliminarPlaylist(id){
-  const pl = leerPlaylists();
-  if(!pl[id]) return;
+  if(!MODO_EDITAR) return;
+  const actual = PLAYLISTS[id];
+  if(!actual) return;
   const seguro = await dialogo({
     titulo: '🗑 ELIMINAR PLAYLIST',
-    mensaje: `"${pl[id].nombre}" · ${pl[id].tracks.length} pistas.\n¿Seguro? No se puede deshacer.`,
+    mensaje: `"${actual.nombre}" · ${actual.tracks.length} pistas.\n¿Seguro? No se puede deshacer.`,
     valor: null});
   if(!seguro) return;
-  delete pl[id];
-  guardarPlaylists(pl);
-  pintarPlaylists();
+  const ok = await conPlaylistsGitHub(`curador: eliminar playlist "${actual.nombre}"`, (pl)=>{
+    delete pl[id];
+    return pl;
+  });
+  if(ok){ pintarPlaylists(); avisar('✓ Playlist eliminada'); }
 }
 async function renombrarPlaylist(id){
-  const pl = leerPlaylists();
-  if(!pl[id]) return;
-  const nuevo = await dialogo({titulo: '✎ RENOMBRAR PLAYLIST', mensaje: '', valor: pl[id].nombre});
+  if(!MODO_EDITAR) return;
+  const actual = PLAYLISTS[id];
+  if(!actual) return;
+  const nuevo = await dialogo({titulo: '✎ RENOMBRAR PLAYLIST', mensaje: '', valor: actual.nombre});
   if(nuevo === null || !nuevo.trim()) return;
-  pl[id].nombre = nuevo.trim();
-  guardarPlaylists(pl);
-  pintarPlaylists();
+  const nombreNuevo = nuevo.trim();
+  const ok = await conPlaylistsGitHub(`curador: renombrar playlist a "${nombreNuevo}"`, (pl)=>{
+    if(!pl[id]) return null;
+    pl[id].nombre = nombreNuevo;
+    return pl;
+  });
+  if(ok){ pintarPlaylists(); avisar('✓ Renombrada'); }
 }
 function pintarPlaylists(){
-  const pl = leerPlaylists();
+  const pl = PLAYLISTS;
   const ids = Object.keys(pl).sort((a,b)=> (pl[b].creada||'').localeCompare(pl[a].creada||''));
   $('playlists-status').textContent = ids.length ? `${ids.length} PLAYLISTS` : '';
   const cont = $('playlists-lista');
   cont.innerHTML = '';
   if(!ids.length){
-    cont.innerHTML = '<div class="lf-vacio">Sin playlists todavía · usa ➕ NUEVA PLAYLIST, ' +
-      'o el botón ➕ junto a cualquier pista mientras escuchas.</div>';
+    cont.innerHTML = '<div class="lf-vacio">Sin playlists todavía' +
+      (MODO_EDITAR ? ' · usa ➕ NUEVA PLAYLIST' : '') + '</div>';
     return;
   }
   ids.forEach(id=>{
@@ -3374,16 +3443,18 @@ function pintarPlaylists(){
     const div = document.createElement('div');
     div.innerHTML = `<h3 class="lf-h" style="cursor:pointer">${p.nombre} · ${p.tracks.length} pistas</h3>`;
     div.querySelector('h3').onclick = () => abrirPlaylist(id);
-    const acciones = document.createElement('div');
-    acciones.style.cssText = 'display:flex;gap:6px;margin:-6px 0 10px';
-    const bRen = document.createElement('button');
-    bRen.className='chip'; bRen.style.cssText='font-size:9px;padding:3px 8px';
-    bRen.textContent = '✎ RENOMBRAR'; bRen.onclick = () => renombrarPlaylist(id);
-    const bDel = document.createElement('button');
-    bDel.className='chip'; bDel.style.cssText='font-size:9px;padding:3px 8px';
-    bDel.textContent = '🗑 ELIMINAR'; bDel.onclick = () => eliminarPlaylist(id);
-    acciones.appendChild(bRen); acciones.appendChild(bDel);
-    div.appendChild(acciones);
+    if(MODO_EDITAR){
+      const acciones = document.createElement('div');
+      acciones.style.cssText = 'display:flex;gap:6px;margin:-6px 0 10px';
+      const bRen = document.createElement('button');
+      bRen.className='chip'; bRen.style.cssText='font-size:9px;padding:3px 8px';
+      bRen.textContent = '✎ RENOMBRAR'; bRen.onclick = () => renombrarPlaylist(id);
+      const bDel = document.createElement('button');
+      bDel.className='chip'; bDel.style.cssText='font-size:9px;padding:3px 8px';
+      bDel.textContent = '🗑 ELIMINAR'; bDel.onclick = () => eliminarPlaylist(id);
+      acciones.appendChild(bRen); acciones.appendChild(bDel);
+      div.appendChild(acciones);
+    }
     const lista = document.createElement('div');
     if(!p.tracks.length){
       lista.innerHTML = '<div class="lf-vacio">Vacía por ahora</div>';
@@ -3408,8 +3479,7 @@ function pintarPlaylists(){
   });
 }
 function abrirPlaylist(id){
-  const pl = leerPlaylists();
-  const p = pl[id];
+  const p = PLAYLISTS[id];
   if(!p) return;
   const tracks = p.tracks.map((t,i)=>({...t, num:i+1}));
   abrirAlbumObjeto({
@@ -3599,6 +3669,9 @@ document.addEventListener('keydown', ev=>{
   if(MODO_EDITAR){
     $('btn-nuevo-album').style.display = '';
     $('btn-nuevo-album').onclick = nuevoAlbum;
+    $('btn-nueva-playlist').style.display = '';
+    $('btn-import-yt-playlist').style.display = '';
+    $('btn-import-csv-playlist').style.display = '';
   }
   await cargarIndice();
   pintarSelectorTemas();
